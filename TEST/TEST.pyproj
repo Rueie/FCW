@@ -25,6 +25,8 @@
     <Compile Include="TEST.py" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="A lot of posl diagrams in one project.xml" />
+    <Content Include="A lot of pres diagrams in one project.xml" />
     <Content Include="Params.txt" />
     <Content Include="Test diagram classes with all examples.xml" />
     <Content Include="Test diagram classes XML2.1.xml" />

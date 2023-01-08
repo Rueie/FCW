@@ -88,8 +88,9 @@ class Model(Object):
                         result_page_job_tracert.insert(tk.END,"Class '"+child["name"]+"' is added to the model\n")
                         self.Add_obj_to_model(new_obj_class)
                         result_page_job_tracert.insert(tk.END,"Class '"+child["name"]+"' added to the model\n")
-                        result_page_job_tracert.configure(state="disabled")
                         del new_obj_class
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page_job_tracert.configure(state="disabled")
                         result_page.after(1,result_page.update())
                     if child["xmi:type"]=="uml:Association":
                         result_page_job_tracert.configure(state="normal")
@@ -110,8 +111,40 @@ class Model(Object):
                         self.Add_obj_to_model(new_obj_connection)
                         result_page_job_tracert.insert(tk.END,tracert_string+"' added to the model\n")
                         del new_obj_connection
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page_job_tracert.configure(state="disabled")
                         result_page.after(1,result_page.update())
-                    result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                    if child["xmi:type"]=="uml:UseCase":
+                        new_use_case=obj_Use_Case()
+                        result_page_job_tracert.configure(state="normal")
+                        result_page_job_tracert.insert(tk.END,"Use case '"+child["name"]+"' being read\n")
+                        new_use_case.Set_id(child["xmi:id"])
+                        new_use_case.Set_name(child["name"])
+                        new_use_case.Set_type(child["xmi:type"])
+                        result_page_job_tracert.insert(tk.END,"Use case '"+child["name"]+"' is read\n")
+                        new_use_case.Parse_use_case(child)
+                        result_page_job_tracert.insert(tk.END,"Use case '"+child["name"]+"' is added to the model\n")
+                        self.Add_obj_to_model(new_use_case)
+                        result_page_job_tracert.insert(tk.END,"Use case '"+child["name"]+"' added to the model\n")
+                        del new_use_case
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page_job_tracert.configure(state="disabled")
+                        result_page.after(1,result_page.update())
+                    if child["xmi:type"]=="uml:Actor":
+                        new_actor=Object()
+                        result_page_job_tracert.configure(state="normal")
+                        result_page_job_tracert.insert(tk.END,"Actor '"+child["name"]+"' being read\n")
+                        new_actor.Set_name(child["name"])
+                        new_actor.Set_id(child["xmi:id"])
+                        new_actor.Set_type(child["xmi:type"])
+                        result_page_job_tracert.insert(tk.END,"Actor '"+child["name"]+"' is read\n")
+                        result_page_job_tracert.insert(tk.END,"Actor '"+child["name"]+"' is added to the model\n")
+                        self.Add_obj_to_model(new_actor)
+                        result_page_job_tracert.insert(tk.END,"Actor '"+child["name"]+"' added to the model\n")
+                        del new_actor
+                        result_page_job_tracert.configure(state="disabled")
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page.after(1,result_page.update())
                     result_page_job_tracert.yview_moveto('1.0')
         result_page_progressbar.configure(maximum=len(self.list_of_objects))
         result_page_progressbar.configure(value=0)
@@ -122,8 +155,6 @@ class Model(Object):
             if current_node.Get_type()=="uml:Class":
                 result_page_job_tracert.configure(state="normal")
                 result_page_job_tracert.insert(tk.END,"Class '"+current_node.Get_name()+"' is post-analyzed\n")
-                for j in range(0,len(current_node.Get_parents_id())):
-                    current_node.Change_parent(j,self.Find_name_to_ip(current_node.Get_parent(j)))
                 for j in range(0,len(current_node.Get_list_of_parametres())):
                     current_param=current_node.Get_info_about_param(j)
                     current_association=None
@@ -160,6 +191,22 @@ class Model(Object):
                 result_page_job_tracert.configure(state="disabled")
                 result_page.after(1,result_page.update())
                 result_page_job_tracert.yview_moveto('1.0')
+        result_page_label3.configure(text="Post-processing of use cases...")
+        for i in range(0,len(self.list_of_objects)):
+            current_node=self.list_of_objects[i]
+            if current_node.Get_type()=="uml:UseCase":
+                result_page_job_tracert.configure(state="normal")
+                result_page_job_tracert.insert(tk.END,"Use case '"+current_node.Get_name()+"' is post-analyzed\n")
+                if len(current_node.Get_list_of_extentions())!=0:
+                    our_list_of_extentions=current_node.Get_list_of_extentions()
+                    for j in range(0,len(our_list_of_extentions)):
+                        self.Find_obj_to_ip(our_list_of_extentions[j]).Add_extention(current_node.Get_id())
+                        current_node.Delete_extention(j)
+                result_page_job_tracert.insert(tk.END,"Changes related to the association '"+current_node.Get_name()+"' have been made to the model\n")
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page_job_tracert.configure(state="disabled")
+                result_page.after(1,result_page.update())
+                result_page_job_tracert.yview_moveto('1.0')
         result_page_label3.configure(text="Post-processing of associations...")
         for i in range(0,len(self.list_of_objects)):
             current_node=self.list_of_objects[i]
@@ -183,7 +230,21 @@ class Model(Object):
                             our_param.append(sender.Get_name())
                             our_param.append(our_name)
                             recipient.Add_param(our_param)
+                    for j in range(0,len(sender.Get_list_of_parametres())):
+                        if sender.Get_parent(j)==recipient.Get_id():
+                            sender.Delete_parent(j)
+                            break
                     result_page_job_tracert.insert(tk.END,"Changes related to the association '"+current_node.Get_id()+"' have been made to the model\n")
+                elif self.Find_obj_to_ip(current_node.Get_sender_class_id()).Get_type()=="uml:Actor":
+                    flag=False
+                    our_actors=self.Find_obj_to_ip(current_node.Get_recipient_class_id()).Get_list_of_actors()
+                    for j in range(0,len(our_actors)):
+                        if our_actors[j]==current_node.Get_sender_class_id():
+                            flag=True
+                            break
+                    if flag==False:
+                        self.Find_obj_to_ip(current_node.Get_recipient_class_id()).Add_actor(current_node.Get_sender_class_id())
+                    result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
                 result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
                 result_page_job_tracert.configure(state="disabled")
                 result_page.after(1,result_page.update())
@@ -234,7 +295,7 @@ class obj_Class(Object):
                 self.list_of_functions[number_func][number_of_string]=new_string
         return
     def Get_parent(self,number_of_parent):
-        if number_of_parent>len(self.parents_id):
+        if number_of_parent>len(self.parents_id) or len(self.parents_id)==0:
             return None
         else:
             return self.parents_id[number_of_parent]
@@ -295,6 +356,14 @@ class obj_Class(Object):
                     if i.name=="ownedparameter" and i["direction"]=="return":
                         new_operation[1]=i["type"]
                 self.Add_func(new_operation)
+            if child.name=="generalization":
+                flag=False
+                for i in range(0,len(self.parents_id)):
+                    if self.parents_id[i]==child["general"]:
+                        flag=True
+                        break
+                if flag==False:
+                    self.Add_parents(child["general"])
         self.Change_params_to_correct()
         return
     def Change_params_to_correct(self):
@@ -331,6 +400,12 @@ class obj_Class(Object):
         if number_of_param<0 or number_of_param>len(self.list_of_parametres):
             return None
         del self.list_of_parametres[number_of_param]
+    def Delete_parent(self,number_of_perent):
+        if number_of_perent<0 or (number_of_perent-1)>len(self.parents_id):
+            return None
+        else:
+            del self.parents_id[number_of_perent]
+        return
     
 class obj_Connection(Object):
     sender_class_id=""
@@ -461,6 +536,99 @@ class obj_Connection(Object):
         if self.role_recipient=="":
             self.role_recipient="None"
         return
+    
+class obj_Use_Case(Object):
+    list_of_actors=[]
+    list_of_parents=[]
+    list_of_includions=[]#что входит в данный Use Case (об€зательно)
+    list_of_extentions=[]#что расшир€ет данный Use Case (необ€зательно, но возможно)
+    def __init__(self):
+        self.list_of_actors=[]
+        self.list_of_parents=[]
+        self.list_of_includions=[]
+        self.list_of_extentions=[]
+        return
+    def Add_actor(self,new_actor):
+        self.list_of_actors.append(new_actor)
+        return
+    def Change_actor(self,number_of_actor,changed_actor):
+        if number_of_actor<0 or (number_of_actor-1)>len(self.list_of_actors):
+            return None
+        else:
+            self.list_of_actors[number_of_actor]=changed_actor
+        return
+    def Get_info_about_actor(self,number_of_actor):
+        if number_of_actor<0 or (number_of_actor-1)>len(self.list_of_actors):
+            return None
+        else:
+            return self.list_of_actors[number_of_actor]
+    def Get_list_of_actors(self):
+        return self.list_of_actors
+    def Add_parent(self,new_parent):
+        self.list_of_parents.append(new_parent)
+        return
+    def Change_parent(self,number_of_parent,changed_parent):
+        if number_of_parent<0 or (number_of_parent-1)>len(self.list_of_parents):
+            return None
+        else:
+            self.list_of_parents[number_of_parent]=changed_parent
+        return
+    def Get_info_about_parent(self,number_of_parent):
+        if number_of_parent<0 or (number_of_parent-1)>len(self.list_of_parents):
+            return None
+        else:
+            return self.list_of_parents[number_of_parent]
+    def Get_list_of_parents(self):
+        return self.list_of_parents
+    def Add_includion(self,new_includion):
+        self.list_of_includions.append(new_includion)
+        return
+    def Change_includion(self,number_of_includion,changed_includion):
+        if number_of_includion<0 or (number_of_includion-1)>len(self.list_of_includions):
+            return None
+        else:
+            self.list_of_includions[number_of_includion]=changed_includion
+        return
+    def Get_info_about_includion(self,number_of_includion):
+        if number_of_includion<0 or (number_of_includion-1)>len(self.list_of_includions):
+            return None
+        else:
+            return self.list_of_includions[number_of_includion]
+    def Get_list_of_includions(self):
+        return self.list_of_includions
+    def Add_extention(self,new_extention):
+        self.list_of_extentions.append(new_extention)
+        return
+    def Change_extention(self,number_of_extention,changed_extention):
+        if number_of_extention<0 or (number_of_extention-1)>len(self.list_of_extentions):
+            return None
+        else:
+            self.list_of_extentions[number_of_extention]=changed_extention
+        return
+    def Get_info_about_extention(self,number_of_extention):
+        if number_of_extention<0 or (number_of_extention-1)>len(self.list_of_extentions):
+            return None
+        else:
+            return self.list_of_extentions[number_of_extention]
+    def Get_list_of_extentions(self):
+        return self.list_of_extentions
+    def Delete_extention(self,number_of_extention):
+        if number_of_extention<0 or (number_of_extention-1)>len(self.list_of_extentions):
+            return None
+        else:
+            del self.list_of_extentions[number_of_extention]
+        return
+    def Parse_use_case(self,root):
+        local_root=root
+        for child in local_root.children:
+            if child.name=="include":
+                self.list_of_includions.append(child["addition"])
+            if child.name=="extend":
+                self.list_of_extentions.append(child["extendedcase"])
+            if child.name=="generalization":
+                self.list_of_parents.append(child["general"])
+        return
+    
 #конец раздела классов xml
 
 #раздел с разными командами интерфейса
@@ -629,7 +797,8 @@ def start_analyze():
             else:
                 tracert_page_tree.insert(i,index=END,iid=local_numbers,text="Parents")
                 for j in range(0,len(our_parents)):
-                    tracert_page_tree.insert(local_numbers,index=END,text="Parent: "+our_parents[j])
+                    tracert_page_tree.insert(local_numbers,index=END,text="Parent: "+our_model.Find_name_to_ip(our_parents[j]))
+                    tracert_page_tree.insert(local_numbers,index=END,text="Parent id: "+our_parents[j])
             our_params=our_list_of_objects[i].Get_list_of_parametres()
             local_numbers+=1
             if our_params==[]:
@@ -689,6 +858,50 @@ def start_analyze():
             current_string="Recipient type: "
             current_string+=our_list_of_objects[i].Take_type_string_from_type_number(our_list_of_objects[i].Get_type_of_the_number_of_recipient_class())
             tracert_page_tree.insert(i,index=tk.END,text=current_string)
+        if our_list_of_objects[i].Get_type()=="uml:Actor":
+            tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
+            tracert_page_tree.insert(i,index=tk.END,text="Type: Actor")
+            tracert_page_tree.insert(i,index=tk.END,text="Id: "+our_list_of_objects[i].Get_id())
+        if our_list_of_objects[i].Get_type()=="uml:UseCase":
+            tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
+            tracert_page_tree.insert(i,index=tk.END,text="Type: Use Case")
+            tracert_page_tree.insert(i,index=tk.END,text="Id: "+our_list_of_objects[i].Get_id())
+            if len(our_list_of_objects[i].Get_list_of_actors())==0:
+                tracert_page_tree.insert(i,index=tk.END,text="Actors: None")
+            else:
+                local_numbers+=1
+                tracert_page_tree.insert(i,iid=local_numbers,index=tk.END,text="Actors")
+                our_list_of_actors=our_list_of_objects[i].Get_list_of_actors()
+                for j in range(0,len(our_list_of_actors)):
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent: "+our_model.Find_name_to_ip(our_list_of_actors[j]))
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent id: "+our_list_of_actors[j])
+            if len(our_list_of_objects[i].Get_list_of_parents())==0:
+                tracert_page_tree.insert(i,index=tk.END,text="Parents: None")
+            else:
+                local_numbers+=1
+                tracert_page_tree.insert(i,iid=local_numbers,index=tk.END,text="Parents")
+                our_list_of_parents=our_list_of_objects[i].Get_list_of_parents()
+                for j in range(0,len(our_list_of_parents)):
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent: "+our_model.Find_name_to_ip(our_list_of_parents[j]))
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent id: "+our_list_of_parents[j])
+            if len(our_list_of_objects[i].Get_list_of_includions())==0:
+                tracert_page_tree.insert(i,index=tk.END,text="Includions: None")
+            else:
+                local_numbers+=1
+                tracert_page_tree.insert(i,iid=local_numbers,index=tk.END,text="Includions")
+                our_list_of_includions=our_list_of_objects[i].Get_list_of_includions()
+                for j in range(0,len(our_list_of_includions)):
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Includion: "+our_model.Find_name_to_ip(our_list_of_includions[j]))
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Includion id: "+our_list_of_includions[j])
+            if len(our_list_of_objects[i].Get_list_of_extentions())==0:
+                tracert_page_tree.insert(i,index=tk.END,text="Extentions: None")
+            else:
+                local_numbers+=1
+                tracert_page_tree.insert(i,iid=local_numbers,index=tk.END,text="Extentions")
+                our_list_of_extentions=our_list_of_objects[i].Get_list_of_extentions()
+                for j in range(0,len(our_list_of_extentions)):
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Extention: "+our_model.Find_name_to_ip(our_list_of_extentions[j]))
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Extention id: "+our_list_of_extentions[j])
     if login_button['state']=='normal':
         pages.tab(2,state="disabled")
     return
