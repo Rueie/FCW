@@ -1,3 +1,4 @@
+from distutils.command.check import check
 import math
 import tkinter as tk
 from tkinter import CENTER, END, LEFT, RIGHT, ttk
@@ -75,8 +76,10 @@ class Model(Object):
         result_page_progressbar.configure(maximum=10000)
         for child in local_root.descendants:
             if child!="\n":
-                if child.name=="packagedelement" or child.name=="nestedclassifier":
-                    if child["xmi:type"]=="uml:Class":
+                if child.name=="xmi:Extension":
+                    break
+                elif child.name=="packagedelement" or child.name=="nestedclassifier" or child.name=="lifeline" or child.name=="message" or child.name=="fragment" or child.name=="ownedattribute":
+                    if child["xmi:type"]=="uml:Class" or child["xmi:type"]=="uml:Component":
                         result_page_job_tracert.configure(state="normal")
                         result_page_job_tracert.insert(tk.END,"Class '"+child["name"]+"' being read\n")
                         new_obj_class=obj_Class()
@@ -145,10 +148,99 @@ class Model(Object):
                         result_page_job_tracert.configure(state="disabled")
                         result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
                         result_page.after(1,result_page.update())
+                    if child["xmi:type"]=="uml:Lifeline":
+                        new_obj_lifeLine=obj_LifeLine()
+                        result_page_job_tracert.configure(state="normal")
+                        result_page_job_tracert.insert(tk.END,"Lifeline '"+child["name"]+"' being read\n")
+                        new_obj_lifeLine.Set_id(child["xmi:id"])
+                        new_obj_lifeLine.Set_type(child["xmi:type"])
+                        new_obj_lifeLine.Set_name(child["name"])
+                        new_obj_lifeLine.Set_connected_object_id(child["represents"])
+                        result_page_job_tracert.insert(tk.END,"Lifeline '"+child["name"]+"' is read\n")
+                        result_page_job_tracert.insert(tk.END,"Lifeline '"+child["name"]+"' is added to the model\n")
+                        self.Add_obj_to_model(new_obj_lifeLine)
+                        result_page_job_tracert.insert(tk.END,"Lifeline '"+child["name"]+"' added to the model\n")
+                        del new_obj_lifeLine
+                        result_page_job_tracert.configure(state="disabled")
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page.after(1,result_page.update())
+                    if child["xmi:type"]=="uml:OccurrenceSpecification":
+                        our_point=Object()
+                        our_point.Set_id(child["xmi:id"])
+                        our_point.Set_type(child["xmi:type"])
+                        our_point.Set_name(child["covered"])
+                        self.Add_obj_to_model(our_point)
+                        del our_point
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page.after(1,result_page.update())
+                    if child["xmi:type"]=="uml:Message":
+                        our_obj_time_connection=obj_Time_connection()
+                        result_page_job_tracert.configure(state="normal")
+                        current_name=""
+                        if child.has_attr("name")==True:
+                            current_name=child["name"]
+                        else:
+                            current_name=child["xmi:id"]
+                        result_page_job_tracert.insert(tk.END,"Lifeline connection '"+current_name+"' being read\n")
+                        our_obj_time_connection.Set_type(child["xmi:type"])
+                        our_obj_time_connection.Set_id(child["xmi:id"])
+                        if child.has_attr("name"):
+                            our_obj_time_connection.Set_name(child["name"])
+                        else:
+                            our_obj_time_connection.Set_name("None")
+                        if child.has_attr("sendevent"):
+                            our_obj_time_connection.Set_id_point_from(child["sendevent"])
+                        else:
+                            our_obj_time_connection.Set_id_point_from("None")
+                        if child.has_attr("receiveevent"):
+                            our_obj_time_connection.Set_id_point_to(child["receiveevent"])
+                        else:
+                            our_obj_time_connection.Set_id_point_to("None")
+                        our_obj_time_connection.Set_kind_connection(child["messagekind"])
+                        our_obj_time_connection.Set_type_connection(child["messagesort"])
+                        result_page_job_tracert.insert(tk.END,"Lifeline connection '"+current_name+"' is read\n")
+                        result_page_job_tracert.insert(tk.END,"Lifeline connection '"+current_name+"' is added to the model\n")
+                        self.Add_obj_to_model(our_obj_time_connection)
+                        result_page_job_tracert.insert(tk.END,"Lifeline connection '"+current_name+"' added to the model\n")
+                        del our_obj_time_connection
+                        result_page_job_tracert.configure(state="disabled")
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page.after(1,result_page.update())
+                    if child["xmi:type"]=="uml:Property" and child.has_attr("name")==False and child.has_attr("visibility")==False:
+                        our_life_line=None
+                        for i in range(0,len(self.list_of_objects)):
+                            if self.list_of_objects[i].Get_type()=="uml:Lifeline" and self.list_of_objects[i].Get_connected_object_id()==child["xmi:id"]:
+                                our_life_line=self.list_of_objects[i]
+                                break
+                        if len(child.contents)!=0:
+                            our_life_line.Set_connected_object_id(child.contents[1]["xmi:idref"])
+                    if child["xmi:type"]=="uml:CombinedFragment":
+                        our_alternative=obj_Alternative()
+                        result_page_job_tracert.configure(state="normal")
+                        result_page_job_tracert.insert(tk.END,"Alternative '"+child["name"]+"' being read\n")
+                        our_alternative.Set_id(child["xmi:id"])
+                        our_alternative.Set_type(child["xmi:type"])
+                        our_alternative.Set_name(child["name"])
+                        our_alternative.Set_type_alternative(child["interactionoperator"])
+                        our_alternative.Parse_alternative(child)
+                        result_page_job_tracert.insert(tk.END,"Alternative '"+child["name"]+"' is read\n")
+                        result_page_job_tracert.insert(tk.END,"Alternative '"+child["name"]+"' is added to the model\n")
+                        self.Add_obj_to_model(our_alternative)
+                        result_page_job_tracert.insert(tk.END,"Alternative '"+child["name"]+"' added to the model\n")
+                        del our_alternative
+                        result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                        result_page_job_tracert.configure(state="disabled")
+                        result_page.after(1,result_page.update())
+                    if child["xmi:type"]=="uml:InstanceSpecification":
+                        for i in range(0,len(self.list_of_objects)):
+                            if self.list_of_objects[i].Get_type()=="uml:Lifeline":
+                                if child["xmi:id"]==self.list_of_objects[i].Get_connected_object_id():
+                                    self.list_of_objects[i].Set_connected_object_id(child["classifier"])
+                                    break
                     result_page_job_tracert.yview_moveto('1.0')
         result_page_progressbar.configure(maximum=len(self.list_of_objects))
         result_page_progressbar.configure(value=0)
-        result_page_label3.configure(text="Post-processing of classes...")
+        result_page_label3.configure(text="Post-processing of classes, components, actors, lifelines...")
         #конечный этап анализа распаршенных элементов модели
         for i in range(0,len(self.list_of_objects)):
             current_node=self.list_of_objects[i]
@@ -188,6 +280,29 @@ class Model(Object):
                             current_node.Change_func(j,k,self.Find_name_to_ip(current_string))
                 result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
                 result_page_job_tracert.insert(tk.END,"Changes related to the class '"+current_node.Get_name()+"' have been made to the model\n")
+                result_page_job_tracert.configure(state="disabled")
+                result_page.after(1,result_page.update())
+                result_page_job_tracert.yview_moveto('1.0')
+            elif current_node.Get_type()=="uml:Component":
+                result_page_job_tracert.configure(state="normal")
+                result_page_job_tracert.insert(tk.END,"Component '"+current_node.Get_name()+"' is post-analyzed\n")
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page_job_tracert.insert(tk.END,"Changes related to the component '"+current_node.Get_name()+"' have been made to the model\n")
+                result_page_job_tracert.configure(state="disabled")
+                result_page_job_tracert.yview_moveto('1.0')
+                result_page.after(1,result_page.update())
+            elif current_node.Get_type()=="uml:Actor":
+                result_page_job_tracert.configure(state="normal")
+                result_page_job_tracert.insert(tk.END,"Actor '"+current_node.Get_name()+"' is post-analyzed\n")
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page_job_tracert.insert(tk.END,"Changes related to the actor '"+current_node.Get_name()+"' have been made to the model\n")
+                result_page_job_tracert.configure(state="disabled")
+                result_page_job_tracert.yview_moveto('1.0')
+            elif current_node.Get_type()=="uml:Lifeline":
+                result_page_job_tracert.configure(state="normal")
+                result_page_job_tracert.insert(tk.END,"Lifeline '"+current_node.Get_name()+"' is post-analyzed\n")
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page_job_tracert.insert(tk.END,"Changes related to the lifeline '"+current_node.Get_name()+"' have been made to the model\n")
                 result_page_job_tracert.configure(state="disabled")
                 result_page.after(1,result_page.update())
                 result_page_job_tracert.yview_moveto('1.0')
@@ -249,8 +364,187 @@ class Model(Object):
                 result_page_job_tracert.configure(state="disabled")
                 result_page.after(1,result_page.update())
                 result_page_job_tracert.yview_moveto('1.0')
+        result_page_label3.configure(text="Post-processing of lifeline connections...")
+        for i in range(0,len(self.list_of_objects)):
+            if self.list_of_objects[i].Get_type()=="uml:Message":
+                result_page_job_tracert.configure(state="normal")
+                result_page_job_tracert.insert(tk.END,"Lifeline connection '"+current_node.Get_name()+"' is post-analyzed\n")
+                if self.list_of_objects[i].Get_id_point_from()!="None":
+                    our_point=self.Find_obj_to_ip(self.list_of_objects[i].Get_id_point_from())
+                    self.list_of_objects[i].Set_id_point_from(our_point.Get_name())
+                if self.list_of_objects[i].Get_id_point_to()!="None":
+                    our_point=self.Find_obj_to_ip(self.list_of_objects[i].Get_id_point_to())
+                    self.list_of_objects[i].Set_id_point_to(our_point.Get_name())
+                result_page_job_tracert.insert(tk.END,"Changes related to the lifeline connection '"+current_node.Get_name()+"' have been made to the model\n")
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page_job_tracert.yview_moveto('1.0')
+                result_page_job_tracert.configure(state="disabled")
+                result_page.after(1,result_page.update())
+        result_page_label3.configure(text="Cleaning the model from auxiliary elements...")
+        i=0
+        while i<len(self.list_of_objects):
+            if self.list_of_objects[i].Get_type()=="uml:OccurrenceSpecification":
+                result_page_job_tracert.configure(state="normal")
+                self.list_of_objects.pop(i)
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page_job_tracert.configure(state="disabled")
+                result_page.after(1,result_page.update())
+            else:
+                i+=1
         result_page_label3.configure(text="Model processing is completed")
+        result_page_progressbar.configure(value=result_page_progressbar["maximum"])
         return
+    def Check_model(self):
+        global_number=0
+        check_list=[]
+        check_position=0
+        new_check_elem=[]
+        flag_check=False
+        if len(self.list_of_objects)!=0:
+        #проверка на повторение имен
+            for i in range(0,len(self.list_of_objects)):
+                flag_check=False
+                if self.list_of_objects[i].Get_type()=="uml:Class" or self.list_of_objects[i].Get_type()=="uml:UseCase" or self.list_of_objects[i].Get_type()=="uml:Actor" or self.list_of_objects[i].Get_type()=="uml:Component":
+                    for j in range(0,len(check_list)):
+                        if check_list[j][0]==self.list_of_objects[i].Get_name():
+                            flag_check=True
+                            check_position=j
+                    if flag_check==True:
+                        check_list[check_position].append(self.list_of_objects[i].Get_id())
+                    else:
+                        new_check_elem=[]
+                        new_check_elem.append(self.list_of_objects[i].Get_name())
+                        new_check_elem.append(self.list_of_objects[i].Get_id())
+                        check_list.append(new_check_elem)
+            for i in range(0,len(check_list)):
+                if len(check_list[i])>2:
+                    global_number+=1
+                    result_page_tree.insert("",tk.END,iid=global_number,text="WARNING: several objects with same names")
+                    result_page_tree.insert(global_number,index=tk.END,text="Obects name: "+check_list[i][0])
+                    for j in range(1,len(check_list[i])):
+                        result_page_tree.insert(global_number,index=tk.END,text="Object id: "+check_list[i][j])
+        #проверка на связность с другими объектами 
+            check_list=[]
+            for i in range(0,len(self.list_of_objects)):
+                if self.list_of_objects[i].Get_type()=="uml:Class" or self.list_of_objects[i].Get_type()=="uml:UseCase" or self.list_of_objects[i].Get_type()=="uml:Actor" or self.list_of_objects[i].Get_type()=="uml:Lifeline":
+                    new_check_elem=[]
+                    new_check_elem.append(self.list_of_objects[i].Get_id())
+                    check_list.append(new_check_elem)
+            new_check_elem=[]
+            for i in range(0,len(check_list)):
+                new_check_elem=[]
+                for j in range(0,len(check_list)):
+                    new_check_elem.append(0)
+                check_list[i].append(new_check_elem)
+            for i in range(0,len(self.list_of_objects)):
+                if self.list_of_objects[i].Get_type()=="uml:Association":
+                    sender=self.list_of_objects[i].Get_sender_class_id()
+                    recipient=self.list_of_objects[i].Get_recipient_class_id()
+                    sender_number=0
+                    recipient_number=0
+                    for j in range(0,len(check_list)):
+                        if check_list[j][0]==sender:
+                            sender_number=j
+                        elif check_list[j][0]==recipient:
+                            recipient_number=j
+                    check_list[sender_number][1][recipient_number]=1
+                    check_list[recipient_number][1][sender_number]=1
+                elif self.list_of_objects[i].Get_type()=="uml:Class" and len(self.list_of_objects[i].Get_parents_id())!=0:
+                    parents_list=self.list_of_objects[i].Get_parents_id()
+                    for j in range(0,len(parents_list)):
+                        sender=parents_list[j]
+                        recipient=self.list_of_objects[i].Get_id()
+                    sender_number=0
+                    recipient_number=0
+                    for j in range(0,len(check_list)):
+                        if check_list[j][0]==sender:
+                            sender_number=j
+                        elif check_list[j][0]==recipient:
+                            recipient_number=j
+                    check_list[sender_number][1][recipient_number]=1
+                    check_list[recipient_number][1][sender_number]=1
+                elif self.list_of_objects[i].Get_type()=="uml:UseCase":
+                    sender=""
+                    recipient=""
+                    sender_number=0
+                    recipient_number=0
+                    include_list=self.list_of_objects[i].Get_list_of_includions()
+                    extention_list=self.list_of_objects[i].Get_list_of_extentions()
+                    parents_list=self.list_of_objects[i].Get_list_of_parents()
+                    if len(include_list)!=0:
+                        recipient=self.list_of_objects[i].Get_id()
+                        for j in range(0,len(include_list)):
+                            sender=include_list[j]
+                            for j in range(0,len(check_list)):
+                                if check_list[j][0]==sender:
+                                    sender_number=j
+                                elif check_list[j][0]==recipient:
+                                    recipient_number=j
+                            check_list[sender_number][1][recipient_number]+=1
+                            check_list[recipient_number][1][sender_number]+=1
+                    if len(extention_list)!=0:
+                        recipient=self.list_of_objects[i].Get_id()
+                        for j in range(0,len(extention_list)):
+                            sender=extention_list[j]
+                            for j in range(0,len(check_list)):
+                                if check_list[j][0]==sender:
+                                    sender_number=j
+                                elif check_list[j][0]==recipient:
+                                    recipient_number=j
+                            check_list[sender_number][1][recipient_number]+=1
+                            check_list[recipient_number][1][sender_number]+=1
+                    if len(parents_list)!=0:
+                        recipient=self.list_of_objects[i].Get_id()
+                        for j in range(0,len(parents_list)):
+                            sender=parents_list[j]
+                            for j in range(0,len(check_list)):
+                                if check_list[j][0]==sender:
+                                    sender_number=j
+                                elif check_list[j][0]==recipient:
+                                    recipient_number=j
+                            check_list[sender_number][1][recipient_number]+=1
+                            check_list[recipient_number][1][sender_number]+=1
+                elif self.list_of_objects[i].Get_type()=="uml:Message":
+                    sender=self.list_of_objects[i].Get_id_point_from()
+                    recipient=self.list_of_objects[i].Get_id_point_to()
+                    sender_number=-1
+                    recipient_number=-1
+                    for j in range(0,len(check_list)):
+                        if check_list[j][0]==sender:
+                            sender_number=j
+                        elif check_list[j][0]==recipient:
+                            recipient_number=j
+                    if sender_number!=-1 and recipient_number!=-1:
+                        check_list[sender_number][1][recipient_number]+=1
+                        check_list[recipient_number][1][sender_number]+=1
+                elif self.list_of_objects[i].Get_type()=="uml:Lifeline":
+                    sender=self.list_of_objects[i].Get_id()
+                    recipient=self.list_of_objects[i].Get_connected_object_id()
+                    sender_number=-1
+                    recipient_number=-1
+                    for j in range(0,len(check_list)):
+                        if check_list[j][0]==sender:
+                            sender_number=j
+                        elif check_list[j][0]==recipient:
+                            recipient_number=j
+                    if sender_number!=-1 and recipient_number!=-1:
+                        check_list[sender_number][1][recipient_number]+=1
+                        check_list[recipient_number][1][sender_number]+=1
+            flag_check=False
+            for i in range(0,len(check_list)):
+                counter=0
+                for j in range(0,len(check_list[i][1])):
+                    if check_list[i][1][j]>0:
+                        counter+=1
+                if counter==0:
+                    flag_check=True
+                    global_number+=1
+                    result_page_tree.insert("",tk.END,iid=global_number,text="ERROR: object with no connections")
+                    result_page_tree.insert(global_number,index=tk.END, text="Name: "+self.Find_obj_to_ip(check_list[i][0]).Get_name())
+                    result_page_tree.insert(global_number,index=tk.END, text="Id: "+self.Find_obj_to_ip(check_list[i][0]).Get_id())
+        if flag_check==True:
+            return False
+        return True
     
 class obj_Class(Object):
     parents_id=[]
@@ -628,7 +922,105 @@ class obj_Use_Case(Object):
             if child.name=="generalization":
                 self.list_of_parents.append(child["general"])
         return
-    
+
+class obj_LifeLine(Object):
+    connected_object_id=""
+    def __init__(self):
+        self.connected_object_id=""
+        return
+    def Set_connected_object_id(self,new_connected_object_id):
+        self.connected_object_id=new_connected_object_id
+        return
+    def Get_connected_object_id(self):
+        return self.connected_object_id
+
+class obj_Time_connection(Object):
+    id_point_from=""
+    id_point_to=""
+    direction=""
+    type_connection=""
+    kind_connection=""
+    def __init__(self):
+        self.id_point_from=""
+        self.id_point_to=""
+        self.direction=""
+        self.type_connection=""
+        self.kind_connection=""
+        return
+    def Set_id_point_from(self,new_id_point_from):
+        self.id_point_from=new_id_point_from
+        return
+    def Get_id_point_from(self):
+        return self.id_point_from
+    def Set_id_point_to(self,new_id_point_to):
+        self.id_point_to=new_id_point_to
+        return
+    def Get_id_point_to(self):
+        return self.id_point_to
+    def Set_direction(self,new_direction):
+        self.direction=new_direction
+        return
+    def Get_direction(self):
+        return self.direction
+    def Set_type_connection(self,new_type_connection):
+        self.type_connection=new_type_connection
+        return
+    def Get_type_connection(self):
+        return self.type_connection
+    def Set_kind_connection(self,new_kind_connection):
+        self.kind_connection=new_kind_connection
+        return
+    def Get_kind_connection(self):
+        return self.kind_connection
+
+class obj_Alternative(Object):
+    type_alternative=""
+    list_of_covered_lifeline=[]
+    list_of_alternatives=[]
+    def __init__(self):
+        self.type_alternative=""
+        self.list_of_covered_lifeline=[]
+        self.list_of_alternatives=[]
+        return
+    def Set_type_alternative(self,new_type_alternative):
+        self.type_alternative=new_type_alternative
+        return
+    def Get_type_alternative(self):
+        return self.type_alternative
+    def Add_covered_lifeline(self,new_covered_lifeline):
+        self.list_of_covered_lifeline.append(new_covered_lifeline)
+        return
+    def Get_list_of_covered_lifeline(self):
+        return self.list_of_covered_lifeline
+    def Get_covered_lifeline(self,number_covered_lifeline):
+        if number_covered_lifeline<0 or (number_covered_lifeline-1)>len(self.list_of_covered_lifeline):
+            return None
+        else:
+            return self.list_of_covered_lifeline[number_covered_lifeline]
+    def Add_alternative(self,new_alternative):
+        self.list_of_alternatives.append(new_alternative)
+        return
+    def Get_list_of_alternatives(self):
+        return self.list_of_alternatives
+    def Get_alternative(self,number_of_alternative):
+        if number_of_alternative<0 or (number_of_alternative-1)>len(self.list_of_alternatives):
+            return None
+        else:
+            return self.list_of_alternatives[number_of_alternative]
+    def Parse_alternative(self,root):
+        local_root=root
+        for child in local_root.children:
+            if child.name=="covered":
+                self.Add_covered_lifeline(child["xmi:idref"])
+            elif child.name=="operand":
+                new_alernative_variavnt=[]
+                for elements in child.children:
+                    if elements.name=="guard":
+                        new_alernative_variavnt.append(elements.contents[1]["body"])
+                    elif elements.name=="fragment":
+                        new_alernative_variavnt.append(elements["covered"])
+                self.Add_alternative(new_alernative_variavnt)
+        return
 #конец раздела классов xml
 
 #раздел с разными командами интерфейса
@@ -714,6 +1106,8 @@ def get_path():
     pages.tab(2,state="normal")
     for i in tracert_page_tree.get_children():
         tracert_page_tree.delete(i)
+    for i in result_page_tree.get_children():
+        result_page_tree.delete(i)
     pages.tab(2,state="disabled")
     if file_path!="":
         check_format=""
@@ -779,16 +1173,21 @@ def start_analyze():
         result_page_job_tracert.delete("0.0",tk.END)
         for i in tracert_page_tree.get_children():
             tracert_page_tree.delete(i)
+        for i in result_page_tree.get_children():
+            result_page_tree.delete(i)
     our_model=Model("Our model")
     our_model.Parse_model(root)
     pages.tab(2,state="normal")
     our_list_of_objects=our_model.Get_list_of_objects()
     for i in range(0,len(our_list_of_objects)):
         local_numbers=1000000+i*1000
-        if our_list_of_objects[i].Get_type()=="uml:Class":
+        if our_list_of_objects[i].Get_type()=="uml:Class" or our_list_of_objects[i].Get_type()=="uml:Component":
             object_name=our_list_of_objects[i].Get_name()
             tracert_page_tree.insert("",tk.END,iid=i,text=object_name)
-            tracert_page_tree.insert(i,index=END,text="Type: Class")
+            if our_list_of_objects[i].Get_type()=="uml:Class":
+                tracert_page_tree.insert(i,index=END,text="Type: Class")
+            else:
+                tracert_page_tree.insert(i,index=END,text="Type: Component")
             tracert_page_tree.insert(i,index=END,text="Id: "+our_list_of_objects[i].Get_id())
             tracert_page_tree.insert(i,index=END,text="Name: "+our_list_of_objects[i].Get_name())
             our_parents=our_list_of_objects[i].Get_parents_id()
@@ -902,8 +1301,48 @@ def start_analyze():
                 for j in range(0,len(our_list_of_extentions)):
                     tracert_page_tree.insert(local_numbers,index=tk.END,text="Extention: "+our_model.Find_name_to_ip(our_list_of_extentions[j]))
                     tracert_page_tree.insert(local_numbers,index=tk.END,text="Extention id: "+our_list_of_extentions[j])
+        if our_list_of_objects[i].Get_type()=="uml:Lifeline":
+            tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
+            tracert_page_tree.insert(i,index=tk.END,text="Type: "+our_list_of_objects[i].Get_type())
+            tracert_page_tree.insert(i,index=tk.END,text="Id: "+our_list_of_objects[i].Get_id())
+            our_string="Connected object: "+our_list_of_objects[i].Get_connected_object_id()+"("
+            if our_model.Find_name_to_ip(our_list_of_objects[i].Get_connected_object_id())!=None:
+                our_string+=our_model.Find_name_to_ip(our_list_of_objects[i].Get_connected_object_id())
+            else:
+                our_string+="None"
+            our_string+=")"
+            tracert_page_tree.insert(i,index=tk.END,text=our_string)
+        if our_list_of_objects[i].Get_type()=="uml:Message":
+            if our_list_of_objects[i].Get_name()=="None":
+                tracert_page_tree.insert("",tk.END,iid=i,text="No name")
+            else:
+                tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
+            tracert_page_tree.insert(i,index=tk.END,text="Type: "+our_list_of_objects[i].Get_type())
+            tracert_page_tree.insert(i,index=tk.END,text="Id: "+our_list_of_objects[i].Get_id())
+            tracert_page_tree.insert(i,index=tk.END,text="Id sender lifeline: "+our_list_of_objects[i].Get_id_point_from()+"("+our_model.Find_name_to_ip(our_list_of_objects[i].Get_id_point_from())+")")
+            tracert_page_tree.insert(i,index=tk.END,text="Id recipient lifeline: "+our_list_of_objects[i].Get_id_point_to()+"("+our_model.Find_name_to_ip(our_list_of_objects[i].Get_id_point_to())+")")
+            tracert_page_tree.insert(i,index=tk.END,text="Type connection: "+our_list_of_objects[i].Get_type_connection())
+            tracert_page_tree.insert(i,index=tk.END,text="Kind connection: "+our_list_of_objects[i].Get_kind_connection())
+        if our_list_of_objects[i].Get_type()=="uml:CombinedFragment":
+            tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
+            tracert_page_tree.insert(i,index=tk.END,text="Type: "+our_list_of_objects[i].Get_type())
+            tracert_page_tree.insert(i,index=tk.END,text="Id: "+our_list_of_objects[i].Get_id())
+            local_numbers+=1
+            tracert_page_tree.insert(i,tk.END,iid=local_numbers,text="Covered lifelines")
+            our_list_covered_lifelines=our_list_of_objects[i].Get_list_of_covered_lifeline()
+            for j in range(0,len(our_list_covered_lifelines)):
+                tracert_page_tree.insert(local_numbers,index=tk.END,text="ID lifeline: "+our_list_covered_lifelines[j])
+            our_list_of_alternatives=our_list_of_objects[i].Get_list_of_alternatives()
+            local_numbers+=1
+            tracert_page_tree.insert(i,tk.END,iid=local_numbers,text="Alternatives")
+            for j in range(0,len(our_list_of_alternatives)):
+                tracert_page_tree.insert(local_numbers,tk.END,iid=local_numbers+1+j,text=our_list_of_alternatives[j][0])
+                tracert_page_tree.insert(local_numbers+1+j,index=tk.END,text="Id sender lifeline: "+our_list_of_alternatives[j][1])
+                tracert_page_tree.insert(local_numbers+1+j,index=tk.END,text="Id recipient lifeline: "+our_list_of_alternatives[j][2])
     if login_button['state']=='normal':
         pages.tab(2,state="disabled")
+    if our_model.Check_model()==False:
+        return
     return
 #конец раздела с разными командами интерфейса
 
@@ -977,7 +1416,11 @@ result_page_label1=tk.Label(result_page_frame_result,text="Recommends, warnings 
 result_page_label1.pack(anchor=tk.NW,side=LEFT)
 
 result_page_tree=ttk.Treeview(result_page_frame_result,show="tree")
-result_page_tree.pack(expand=True,fill="both")
+result_page_tree.pack(side=tk.LEFT,expand=True,fill="both")
+
+result_page_tree_srollbar=tk.Scrollbar(result_page_frame_result,orient="vertical",command=result_page_tree.yview)
+result_page_tree_srollbar.pack(side=tk.LEFT,fill="y")
+result_page_tree["yscrollcommand"] = result_page_tree_srollbar.set
 
 result_page_frame_tracert=tk.Frame(result_page)
 result_page_frame_tracert.pack(expand=True,fill="both",anchor=tk.CENTER)
