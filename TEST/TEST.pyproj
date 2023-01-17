@@ -30,6 +30,7 @@
     <Content Include="A lot of pres diagrams in one project.xml" />
     <Content Include="Params.txt" />
     <Content Include="Test diagram classes XML2.1.xml" />
+    <Content Include="Three types of diagrams in one model.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

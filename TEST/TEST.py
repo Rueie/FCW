@@ -17,9 +17,12 @@ class Object:
     id=""
     type=""
     name=""
+    parents_id=[]
     def __init__(self):
         self.id=""
         self.type=""
+        self.name=""
+        self.parents_id=[]
         return
     def Set_id(self,new_id):
         self.id=new_id
@@ -35,7 +38,29 @@ class Object:
     def Get_type(self):
         return self.type
     def Get_name(self):
-        return self.name
+        return self.name    
+    def Add_parents(self,new_parent):
+        self.parents_id.append(new_parent)
+        return
+    def Change_parent(self,number,new_id):
+        if number>len(self.parents_id):
+            return None
+        else:
+            self.parents_id[number]=new_id
+        return
+    def Get_parent(self,number_of_parent):
+        if number_of_parent>len(self.parents_id) or len(self.parents_id)==0:
+            return None
+        else:
+            return self.parents_id[number_of_parent]
+    def Get_parents_id(self):
+        return self.parents_id
+    def Delete_parent(self,number_of_perent):
+        if number_of_perent<0 or (number_of_perent-1)>len(self.parents_id):
+            return None
+        else:
+            del self.parents_id[number_of_perent]
+        return
 
 #НАДО ДОПИСАТЬ!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 class Model(Object):
@@ -72,7 +97,8 @@ class Model(Object):
             if child.name=="packagedelement":
                 local_root=child
                 break
-        result_page_label3.configure(text="Reading the model...")
+        result_page_label3.configure(text="Reading the model...",foreground="#000000")
+        result_page_label4.configure(text="",foreground="#000000")
         result_page_progressbar.configure(maximum=10000)
         for child in local_root.descendants:
             if child!="\n":
@@ -140,6 +166,10 @@ class Model(Object):
                         new_actor.Set_name(child["name"])
                         new_actor.Set_id(child["xmi:id"])
                         new_actor.Set_type(child["xmi:type"])
+                        if len(child.contents)!=0:
+                           for i in range(0,len(child.contents)):
+                            if child.contents[i].name=="generalization":
+                                new_actor.Add_parents(child.contents[i]["general"])
                         result_page_job_tracert.insert(tk.END,"Actor '"+child["name"]+"' is read\n")
                         result_page_job_tracert.insert(tk.END,"Actor '"+child["name"]+"' is added to the model\n")
                         self.Add_obj_to_model(new_actor)
@@ -391,7 +421,7 @@ class Model(Object):
                 result_page.after(1,result_page.update())
             else:
                 i+=1
-        result_page_label3.configure(text="Model processing is completed")
+        result_page_label3.configure(text="Model processing is completed",foreground="#3B973B")
         result_page_progressbar.configure(value=result_page_progressbar["maximum"])
         return
     def Check_model(self):
@@ -399,9 +429,12 @@ class Model(Object):
         check_list=[]
         check_position=0
         new_check_elem=[]
-        flag_check=False
         if len(self.list_of_objects)!=0:
         #проверка на повторение имен
+            result_page_label4.configure(text="Search for warnings...")
+            result_page_progressbar.configure(maximum=len(self.list_of_objects))
+            result_page_progressbar.configure(value=0)
+            result_page.after(1,result_page.update())
             for i in range(0,len(self.list_of_objects)):
                 flag_check=False
                 if self.list_of_objects[i].Get_type()=="uml:Class" or self.list_of_objects[i].Get_type()=="uml:UseCase" or self.list_of_objects[i].Get_type()=="uml:Actor" or self.list_of_objects[i].Get_type()=="uml:Component":
@@ -416,6 +449,11 @@ class Model(Object):
                         new_check_elem.append(self.list_of_objects[i].Get_name())
                         new_check_elem.append(self.list_of_objects[i].Get_id())
                         check_list.append(new_check_elem)
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
+            result_page_progressbar.configure(maximum=len(check_list))
+            result_page_progressbar.configure(value=0)
+            result_page.after(1,result_page.update())
             for i in range(0,len(check_list)):
                 if len(check_list[i])>2:
                     global_number+=1
@@ -423,19 +461,32 @@ class Model(Object):
                     result_page_tree.insert(global_number,index=tk.END,text="Obects name: "+check_list[i][0])
                     for j in range(1,len(check_list[i])):
                         result_page_tree.insert(global_number,index=tk.END,text="Object id: "+check_list[i][j])
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
         #проверка на связность с другими объектами 
+            result_page_label4.configure(text="Search for unrelated elements...")
             check_list=[]
+            result_page_progressbar.configure(maximum=len(self.list_of_objects))
+            result_page_progressbar.configure(value=0)
+            result_page.after(1,result_page.update())
             for i in range(0,len(self.list_of_objects)):
                 if self.list_of_objects[i].Get_type()=="uml:Class" or self.list_of_objects[i].Get_type()=="uml:UseCase" or self.list_of_objects[i].Get_type()=="uml:Actor" or self.list_of_objects[i].Get_type()=="uml:Lifeline":
                     new_check_elem=[]
                     new_check_elem.append(self.list_of_objects[i].Get_id())
                     check_list.append(new_check_elem)
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
             new_check_elem=[]
+            result_page_progressbar.configure(maximum=result_page_progressbar["maximum"]+len(check_list)*2)
+            result_page_progressbar.configure(value=0)
+            result_page.after(1,result_page.update())
             for i in range(0,len(check_list)):
                 new_check_elem=[]
                 for j in range(0,len(check_list)):
                     new_check_elem.append(0)
                 check_list[i].append(new_check_elem)
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
             for i in range(0,len(self.list_of_objects)):
                 if self.list_of_objects[i].Get_type()=="uml:Association":
                     sender=self.list_of_objects[i].Get_sender_class_id()
@@ -470,7 +521,7 @@ class Model(Object):
                     recipient_number=0
                     include_list=self.list_of_objects[i].Get_list_of_includions()
                     extention_list=self.list_of_objects[i].Get_list_of_extentions()
-                    parents_list=self.list_of_objects[i].Get_list_of_parents()
+                    parents_list=self.list_of_objects[i].Get_parents_id()
                     if len(include_list)!=0:
                         recipient=self.list_of_objects[i].Get_id()
                         for j in range(0,len(include_list)):
@@ -530,6 +581,8 @@ class Model(Object):
                     if sender_number!=-1 and recipient_number!=-1:
                         check_list[sender_number][1][recipient_number]+=1
                         check_list[recipient_number][1][sender_number]+=1
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
             flag_check=False
             for i in range(0,len(check_list)):
                 counter=0
@@ -537,17 +590,104 @@ class Model(Object):
                     if check_list[i][1][j]>0:
                         counter+=1
                 if counter==0:
-                    flag_check=True
                     global_number+=1
+                    result_page_job_tracert.configure(state="normal")
+                    result_page_label4.configure(text="Was found the unrelated element.",foreground="#FF0000")
+                    result_page_job_tracert.configure(state="disabled")
                     result_page_tree.insert("",tk.END,iid=global_number,text="ERROR: object with no connections")
                     result_page_tree.insert(global_number,index=tk.END, text="Name: "+self.Find_obj_to_ip(check_list[i][0]).Get_name())
                     result_page_tree.insert(global_number,index=tk.END, text="Id: "+self.Find_obj_to_ip(check_list[i][0]).Get_id())
-        if flag_check==True:
-            return False
+                    return False
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
+        #проверка на циклы наследования
+            result_page_label4.configure(text="Search for inheritance cycles...")
+            check_list=[]
+            result_page_progressbar.configure(maximum=len(self.list_of_objects))
+            result_page_progressbar.configure(value=0)
+            result_page.after(1,result_page.update())
+            for i in range(0,len(self.list_of_objects)):
+                if self.list_of_objects[i].Get_type()=="uml:Class" or self.list_of_objects[i].Get_type()=="uml:Component" or self.list_of_objects[i].Get_type()=="uml:UseCase" or self.list_of_objects[i].Get_type()=="uml:Actor":
+                    new_check_elem=[]
+                    new_check_elem.append(self.list_of_objects[i].Get_id())
+                    new_check_elem.append([])
+                    check_list.append(new_check_elem)
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
+            result_page_progressbar.configure(maximum=len(check_list)*2)
+            result_page_progressbar.configure(value=0)
+            result_page.after(1,result_page.update())
+            for i in range(0,len(check_list)):
+                for j in range(0,len(check_list)):
+                    check_list[i][1].append(0)
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
+            for i in range(0,len(check_list)):
+                sender=self.Find_obj_to_ip(check_list[i][0])
+                our_list_of_parents=sender.Get_parents_id()
+                if len(our_list_of_parents)!=0:
+                    for j in range(0,len(our_list_of_parents)):
+                        position_parent=-1
+                        for k in range(0,len(check_list)):
+                            if our_list_of_parents[j]==check_list[k][0]:
+                                position_parent=k
+                                break
+                        if position_parent!=-1:
+                            check_list[i][1][position_parent]=1
+                result_page_progressbar.configure(value=result_page_progressbar["value"]+1)
+                result_page.after(1,result_page.update())
+            stack=[]
+            number_of_object=0
+            position=0
+            while True:
+                #1-есть связь
+                #2-уже прошли данную вершину
+                #stack-стек из фершин, показывающий нам цикл
+                if len(stack)==0 and position==len(check_list):
+                    number_of_object+=1
+                    position=0
+                elif position==len(check_list):
+                    position=number_of_object
+                    number_of_object=stack.pop()
+                    check_list[number_of_object][1][position]=1
+                    position+=1
+                elif check_list[number_of_object][1][position]==1:
+                    check_list[number_of_object][1][position]=2
+                    stack.append(number_of_object)
+                    number_of_object=position
+                    position=0
+                elif check_list[number_of_object][1][position]==2:
+                    stack.append(number_of_object)
+                    lust_number=number_of_object
+                    for i in range(len(stack)-2,0,-1):
+                        if stack[i]==lust_number and i!=0:
+                            while stack[0]!=lust_number:
+                                stack.pop(0)
+                    global_number+=1
+                    result_page_tree.insert("",tk.END,iid=global_number,text="ERROR: inheritance cycle found")
+                    for i in range(len(stack)):
+                        result_page_tree.insert(global_number,index=tk.END, text="Name: "+self.Find_obj_to_ip(check_list[stack[i]][0]).Get_name())
+                        result_page_tree.insert(global_number,index=tk.END, text="Id: "+self.Find_obj_to_ip(check_list[stack[i]][0]).Get_id())
+                    result_page_job_tracert.configure(state="normal")
+                    result_page_label4.configure(text="Was found the inheritance cycle.",foreground="#FF0000")
+                    result_page_job_tracert.configure(state="disabled")
+                    return False
+                    #position=stack.pop()
+                    #number_of_object=stack.pop()
+                    #check_list[number_of_object][1][position]=1
+                    #position+=1
+                else:
+                    position+=1
+                if number_of_object==len(check_list):
+                    break
+        result_page_job_tracert.configure(state="normal")
+        result_page_progressbar.configure(value=result_page_progressbar["maximum"])
+        result_page_label4.configure(text="The error analysis has been completed.",foreground="#3B973B")
+        result_page_job_tracert.configure(state="disabled")
+        result_page.after(1,result_page.update())
         return True
     
 class obj_Class(Object):
-    parents_id=[]
     list_of_parametres=[]
     list_of_functions=[]
     def __init__(self):
@@ -555,20 +695,11 @@ class obj_Class(Object):
         self.list_of_parametres=[]
         self.list_of_functions=[]
         return
-    def Add_parents(self,new_parent):
-        self.parents_id.append(new_parent)
-        return
     def Add_param(self,new_param):
         self.list_of_parametres.append(new_param)
         return
     def Add_func(self,new_func):
         self.list_of_functions.append(new_func)
-        return
-    def Change_parent(self,number,new_id):
-        if number>len(self.parents_id):
-            return None
-        else:
-            self.parents_id[number]=new_id
         return
     def Change_param(self,number_param,number_of_string,new_string):
         if number_param>len(self.list_of_parametres):
@@ -588,11 +719,6 @@ class obj_Class(Object):
             else:
                 self.list_of_functions[number_func][number_of_string]=new_string
         return
-    def Get_parent(self,number_of_parent):
-        if number_of_parent>len(self.parents_id) or len(self.parents_id)==0:
-            return None
-        else:
-            return self.parents_id[number_of_parent]
     def Get_info_about_param(self,number_of_param):
         if number_of_param>=len(self.list_of_parametres):
             return None
@@ -603,8 +729,6 @@ class obj_Class(Object):
             return None
         else:
             return self.list_of_functions[number_of_func]
-    def Get_parents_id(self):
-        return self.parents_id
     def Get_list_of_parametres(self):
         return self.list_of_parametres
     def Get_list_of_functions(self):
@@ -694,12 +818,6 @@ class obj_Class(Object):
         if number_of_param<0 or number_of_param>len(self.list_of_parametres):
             return None
         del self.list_of_parametres[number_of_param]
-    def Delete_parent(self,number_of_perent):
-        if number_of_perent<0 or (number_of_perent-1)>len(self.parents_id):
-            return None
-        else:
-            del self.parents_id[number_of_perent]
-        return
     
 class obj_Connection(Object):
     sender_class_id=""
@@ -833,12 +951,13 @@ class obj_Connection(Object):
     
 class obj_Use_Case(Object):
     list_of_actors=[]
-    list_of_parents=[]
+    #list_of_parents=[]
     list_of_includions=[]#что входит в данный Use Case (обязательно)
     list_of_extentions=[]#что расширяет данный Use Case (необязательно, но возможно)
     def __init__(self):
         self.list_of_actors=[]
-        self.list_of_parents=[]
+        #self.list_of_parents=[]
+        self.parents_id=[]
         self.list_of_includions=[]
         self.list_of_extentions=[]
         return
@@ -858,22 +977,22 @@ class obj_Use_Case(Object):
             return self.list_of_actors[number_of_actor]
     def Get_list_of_actors(self):
         return self.list_of_actors
-    def Add_parent(self,new_parent):
-        self.list_of_parents.append(new_parent)
-        return
-    def Change_parent(self,number_of_parent,changed_parent):
-        if number_of_parent<0 or (number_of_parent-1)>len(self.list_of_parents):
-            return None
-        else:
-            self.list_of_parents[number_of_parent]=changed_parent
-        return
-    def Get_info_about_parent(self,number_of_parent):
-        if number_of_parent<0 or (number_of_parent-1)>len(self.list_of_parents):
-            return None
-        else:
-            return self.list_of_parents[number_of_parent]
-    def Get_list_of_parents(self):
-        return self.list_of_parents
+    #def Add_parent(self,new_parent):
+    #    self.list_of_parents.append(new_parent)
+    #    return
+    #def Change_parent(self,number_of_parent,changed_parent):
+    #    if number_of_parent<0 or (number_of_parent-1)>len(self.list_of_parents):
+    #        return None
+    #    else:
+    #        self.list_of_parents[number_of_parent]=changed_parent
+    #    return
+    #def Get_info_about_parent(self,number_of_parent):
+    #    if number_of_parent<0 or (number_of_parent-1)>len(self.list_of_parents):
+    #        return None
+    #    else:
+    #        return self.list_of_parents[number_of_parent]
+    #def Get_list_of_parents(self):
+    #    return self.list_of_parents
     def Add_includion(self,new_includion):
         self.list_of_includions.append(new_includion)
         return
@@ -920,7 +1039,7 @@ class obj_Use_Case(Object):
             if child.name=="extend":
                 self.list_of_extentions.append(child["extendedcase"])
             if child.name=="generalization":
-                self.list_of_parents.append(child["general"])
+                self.parents_id.append(child["general"])
         return
 
 class obj_LifeLine(Object):
@@ -1094,7 +1213,8 @@ def login():
 def get_path():
     global number_of_opened_frames
     result_page_progressbar.configure(value=0)
-    result_page_label3.configure(text="Progressbar info")
+    result_page_label3.configure(text="Progressbar info",foreground="#000000")
+    result_page_label4.configure(text="",foreground="#000000")
     file_path=filedialog.askopenfilename()
     files_page_file_path['state']='normal'
     files_page_file_path.delete(0,END)
@@ -1164,6 +1284,8 @@ def get_path():
 def start_analyze():
     global tracert_page_tree, our_model, tracert_page_tree_srcollbar
     result_page_progressbar.configure(value=0)
+    result_page_label3.configure(foreground="#000000")
+    result_page_label4.configure(text="",foreground="#000000")
     xml_file_adress=files_page_file_path.get()
     with open(xml_file_adress) as fp:
         root=BeautifulSoup(fp)
@@ -1261,6 +1383,15 @@ def start_analyze():
             tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
             tracert_page_tree.insert(i,index=tk.END,text="Type: Actor")
             tracert_page_tree.insert(i,index=tk.END,text="Id: "+our_list_of_objects[i].Get_id())
+            if len(our_list_of_objects[i].Get_parents_id())==0:
+                tracert_page_tree.insert(i,index=tk.END,text="Parents: None")
+            else:
+                our_list_of_parents=our_list_of_objects[i].Get_parents_id()
+                local_numbers+=1
+                tracert_page_tree.insert(i,tk.END,iid=local_numbers,text="Parents")
+                for j in range(0,len(our_list_of_parents)):
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent: "+our_model.Find_name_to_ip(our_list_of_parents[j]))
+                    tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent id: "+our_list_of_parents[j])
         if our_list_of_objects[i].Get_type()=="uml:UseCase":
             tracert_page_tree.insert("",tk.END,iid=i,text=our_list_of_objects[i].Get_name())
             tracert_page_tree.insert(i,index=tk.END,text="Type: Use Case")
@@ -1274,12 +1405,12 @@ def start_analyze():
                 for j in range(0,len(our_list_of_actors)):
                     tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent: "+our_model.Find_name_to_ip(our_list_of_actors[j]))
                     tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent id: "+our_list_of_actors[j])
-            if len(our_list_of_objects[i].Get_list_of_parents())==0:
+            if len(our_list_of_objects[i].Get_parents_id())==0:
                 tracert_page_tree.insert(i,index=tk.END,text="Parents: None")
             else:
                 local_numbers+=1
                 tracert_page_tree.insert(i,iid=local_numbers,index=tk.END,text="Parents")
-                our_list_of_parents=our_list_of_objects[i].Get_list_of_parents()
+                our_list_of_parents=our_list_of_objects[i].Get_parents_id()
                 for j in range(0,len(our_list_of_parents)):
                     tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent: "+our_model.Find_name_to_ip(our_list_of_parents[j]))
                     tracert_page_tree.insert(local_numbers,index=tk.END,text="Parent id: "+our_list_of_parents[j])
@@ -1407,7 +1538,10 @@ result_page_start_button=tk.Button(result_page_frame_result,text="Start the anal
 result_page_start_button.pack(anchor=tk.NE,side=tk.TOP,fill="x")
 
 result_page_label3=tk.Label(result_page_frame_result,text="Progressbar info")
-result_page_label3.pack(anchor=tk.CENTER)
+result_page_label3.pack(anchor=tk.N)
+
+result_page_label4=tk.Label(result_page_frame_result,text="")
+result_page_label4.pack(anchor=tk.N)
 
 result_page_progressbar=ttk.Progressbar(result_page_frame_result,orient=tk.HORIZONTAL,length=math.floor(GetSystemMetrics(0)/2))
 result_page_progressbar.pack(anchor=tk.CENTER)
