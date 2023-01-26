@@ -29,6 +29,7 @@
     <Content Include="A lot of posl diagrams in one project.xml" />
     <Content Include="A lot of pres diagrams in one project.xml" />
     <Content Include="Params.txt" />
+    <Content Include="Procrust.xml" />
     <Content Include="Test diagram classes XML2.1.xml" />
     <Content Include="Three types of diagrams in one model.xml" />
   </ItemGroup>
