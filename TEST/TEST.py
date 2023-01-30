@@ -7,7 +7,7 @@ from win32api import GetSystemMetrics
 from bs4 import BeautifulSoup
 from rnnmorph.predictor import RNNMorphPredictor
 
-#file_name_with_params="D:\Diplom\Params.txt"
+file_name_with_params="D:\Diplom\Params.txt"
 number_of_login_windows=0;
 current_window=0
 current_widget=0
@@ -19,7 +19,7 @@ class Object:
     id=""
     type=""
     name=""
-    parents_id=[]
+    parents_id=[]#A list of strings
     def __init__(self):
         self.id=""
         self.type=""
@@ -65,9 +65,11 @@ class Object:
         return
 
 class Model(Object):
-    list_of_diagrams=[]
+    list_of_diagrams=[]#List of obj_Diagram type objects
+    list_of_recomendations=[]#A list of lines with recommendations (in the future, most likely, each recommendation will have its own priority, so that the top recommendations are more significant)
     def __init__(self):
         self.list_of_diagrams=[]
+        self.list_of_recomendations=[]
         return
     def Add_diagram(self,new_diagram):
         self.list_of_diagrams.append(new_diagram)
@@ -84,6 +86,23 @@ class Model(Object):
             if self.list_of_diagrams[i].Find_object(object_id)!=None:
                 return self.list_of_diagrams[i].Find_object(object_id)
         return None
+    def Add_recomendation(self,new_recomendation):
+        flag_extention=False
+        for k in range(0,len(self.list_of_recomendations)):
+            if new_recomendation==self.list_of_recomendations[k]:
+                flag_extention=True
+                break
+        if flag_extention==False:
+            self.list_of_recomendations.append(new_recomendation)
+        self.list_of_recomendations.sort()
+        return
+    def Get_recomendation(self,number_of_recomendation):
+        if number_of_recomendation<0 or number_of_recomendation>=len(self.list_of_recomendations):
+            return None
+        else:
+            return self.list_of_recomendations[number_of_recomendation]
+    def Get_list_of_recomendations(self):
+        return self.list_of_recomendations
     def Parse_model(self,root):
         result_page_label3.configure(text="Reading model from XML file",foreground="#000000")
         result_page_progressbar.configure(value=0)
@@ -116,6 +135,8 @@ class Model(Object):
     def Search_for_recommendations(self):
         for i in range(0,len(self.list_of_diagrams)):
             self.list_of_diagrams[i].Search_for_recommendations()
+        for i in range(0,len(self.list_of_recomendations)):
+            result_page_tree.insert("",index=tk.END,text=self.list_of_recomendations[i])
         return
 
 class obj_Diagram(Object):
@@ -139,6 +160,11 @@ class obj_Diagram(Object):
                     self.list_of_objects.pop(i)
                     break
         return
+    def Get_object(self,number_of_object):
+        if number_of_object<0 or number_of_object>=len(self.list_of_objects):
+            return None
+        else:
+            return self.list_of_objects[number_of_object]
     def Get_list_of_objects(self):
         return self.list_of_objects
     def Find_object(self,object_id):
@@ -502,7 +528,7 @@ class obj_Diagram(Object):
                                 number_of_an_existing_diagram=j
                                 break
                         if flag_exist==False:
-                            result_page_tree.insert("",index=tk.END,text="It is recommended to create a sequence diagram for the '"+self.list_of_objects[i].Get_name()+"' use case")
+                            self.model.Add_recomendation("It is recommended to create a sequence diagram for the '"+self.list_of_objects[i].Get_name()+"' use case")
                         else:
                             list_of_actors=self.list_of_objects[i].Get_list_of_actors()
                             sequence_diagram_objects=self.model.Get_diagram(number_of_an_existing_diagram).Get_list_of_objects()
@@ -513,8 +539,25 @@ class obj_Diagram(Object):
                                         flag_extention=True
                                         break
                                 if flag_extention==False:
-                                    result_page_tree.insert("",index=tk.END,text="It is recommended to add the actor '"+self.model.Find_object_in_model(list_of_actors[j]).Get_name()+"' to the sequence diagram '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'")
-
+                                    self.model.Add_recomendation("It is recommended to add the actor '"+self.model.Find_object_in_model(list_of_actors[j]).Get_name()+"' to the sequence diagram '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'")
+                            list_of_extentions=self.list_of_objects[i].Get_list_of_extentions()
+                            for j in range(0,len(list_of_extentions)):
+                                flag_extention=False
+                                for k in range(0,len(sequence_diagram_objects)):
+                                    if sequence_diagram_objects[k].Get_type()=="uml:CombinedFragment" and self.model.Find_object_in_model(list_of_extentions[j][0]).Get_name()==sequence_diagram_objects[k].Get_name():
+                                        flag_extention=True
+                                        break
+                                if flag_extention==False:
+                                    self.model.Add_recomendation("It is recommended to add the combined fragment '"+self.model.Find_object_in_model(list_of_extentions[j][0]).Get_name()+"' to the sequence diagram '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'")
+                                else:
+                                    flag_extention=False
+                                    list_of_alternatives=sequence_diagram_objects[k].Get_list_of_alternatives()
+                                    for k in range(0,len(list_of_alternatives)):
+                                        if list_of_alternatives[k][0]==list_of_extentions[j][1]:
+                                            flag_extention=True
+                                            break
+                                    if flag_extention==False:
+                                        self.model.Add_recomendation("It is recommended to add a condition'"+list_of_extentions[j][1]+"' the combined fragment '"+self.model.Find_object_in_model(list_of_extentions[j][0]).Get_name()+"' to the sequence diagram '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'")
                     current_fraze=self.list_of_objects[i].Get_name()
                     words=[]
                     begin=0
@@ -543,6 +586,43 @@ class obj_Diagram(Object):
                                 new_noun.append(words[j].normal_form)
                                 new_noun.append(1)
                                 self.list_of_nouns.append(new_noun)
+                elif self.list_of_objects[i].Get_type()=="uml:Actor":
+                    list_of_classes=[]
+                    for j in range(0,len(self.model.Get_list_of_diagrams())):
+                        for k in range(0,len(self.model.Get_diagram(j).Get_list_of_objects())):
+                            if self.model.Get_diagram(j).Get_object(k).Get_type()=="uml:Class":
+                                list_of_classes.append(self.model.Get_diagram(j).Get_object(k))
+                    name_of_signals_class=self.list_of_objects[i].Get_name()+"_signals"
+                    flag_exist=False
+                    for j in range(0,len(list_of_classes)):
+                        if name_of_signals_class==list_of_classes[j].Get_name():
+                            flag_exist=True
+                            break
+                    if flag_exist==False:
+                        self.model.Add_recomendation("It is recommended to create a facade class named '"+name_of_signals_class+"'")
+                    else:
+                        list_of_functions=list_of_classes[j].Get_list_of_functions()
+                        list_of_use_cases=[]
+                        for j in range(0,len(self.list_of_objects)):
+                            if self.list_of_objects[j].Get_type()=="uml:UseCase":
+                                list_of_actors=self.list_of_objects[j].Get_list_of_actors()
+                                for k in range(0,len(list_of_actors)):
+                                    if list_of_actors[k]==self.list_of_objects[i].Get_id():
+                                        list_of_use_cases.append(self.list_of_objects[j])
+                        for j in range(0,len(list_of_use_cases)):
+                            current_function=list_of_use_cases[j].Get_name()
+                            current_function=list(current_function)
+                            for k in range(0,len(current_function)):
+                                if current_function[k]==" ":
+                                    current_function[k]='_'
+                            current_function="".join(current_function)
+                            flag_exist=False
+                            for k in range(0,len(list_of_functions)):
+                                if list_of_functions[k]==current_function:
+                                    flag_exist=True
+                                    break
+                            if flag_exist==False:
+                                self.model.Add_recomendation("It is recommended to add signal handler function with name'"+current_function+"' in facade class '"+name_of_signals_class+"'")
             list_of_class_diagams=[]
             for i in range(0,len(self.model.Get_list_of_diagrams())):
                 if self.model.Get_diagram(i).Get_type()=="Class diagram":
@@ -557,7 +637,76 @@ class obj_Diagram(Object):
                                 flag_exist=True
                                 break
                     if flag_exist==False:
-                        result_page_tree.insert("",index=tk.END,text="It is recommended to create a class named '"+self.list_of_nouns[i][0]+"'")
+                        self.model.Add_recomendation("It is recommended to create a class named '"+self.list_of_nouns[i][0]+"'")
+        if self.type=="Sequence diagram":
+            list_of_use_cases_diagrams=[]
+            for i in range(0,len(self.model.Get_list_of_diagrams())):
+                if self.model.Get_diagram(i).Get_type()=="Use Case diagram":
+                    list_of_use_cases_diagrams.append(self.model.Get_diagram(i))
+            flag_exist=False
+            for i in range(0,len(list_of_use_cases_diagrams)):
+                list_of_use_case_diagram_objects=list_of_use_cases_diagrams[i].Get_list_of_objects()
+                for j in range(0,len(list_of_use_case_diagram_objects)):
+                    if list_of_use_case_diagram_objects[j].Get_name()==self.name:
+                        flag_exist=True
+                        break
+                if flag_exist==True:
+                    break
+            if flag_exist==False:
+                self.model.Add_recomendation("It is recommended to create a use case '"+self.name+"' for the sequence diagram "+self.name+"'")
+            else:
+                list_of_objects=self.Get_list_of_objects()
+                for i in range(0,len(list_of_objects)):
+                    if list_of_objects[i].Get_type()=="uml:Lifeline" and list_of_objects[i].Get_connected_object_id()[0:7]!="EAID_AT":
+                        connected_object=self.model.Find_object_in_model(list_of_objects[i].Get_connected_object_id())
+                        if connected_object.Get_type()!="uml:Actor":
+                            list_of_functions=connected_object.Get_list_of_functions()
+                            list_of_messages=[]
+                            for j in range(0,len(list_of_objects)):
+                                if list_of_objects[j].Get_type()=="uml:Message" and (list_of_objects[j].Get_id_point_from()==list_of_objects[i].Get_id() or list_of_objects[j].Get_id_point_to()==list_of_objects[i].Get_id()):
+                                    list_of_messages.append(list_of_objects[j])
+                            for j in range(0,len(list_of_messages)):
+                                flag_exist=False
+                                for k in range(0,len(list_of_functions)):
+                                    if list_of_messages[j].Get_name()==list_of_functions[k][2]:
+                                        flag_exist=True
+                                        break
+                                if flag_exist==False:
+                                    self.model.Add_recomendation("It is recommended to change the name of the message '"+list_of_messages[j].Get_name()+"' to the name of the function present in the bound object '"+connected_object.Get_name()+"' associated with the timeline '"+list_of_objects[i].Get_name()+"' in the sequence diagram '"+self.name+"'")
+                    if list_of_objects[i].Get_type()=="uml:CombinedFragment":
+                        list_of_covered_lifelines=list_of_objects[i].Get_list_of_covered_lifeline()
+                        j=0
+                        while j<len(list_of_covered_lifelines):
+                            if self.model.Find_object_in_model(list_of_covered_lifelines[j]).Get_connected_object_id()[0:7]=="EAID_AT" or self.model.Find_object_in_model(self.model.Find_object_in_model(list_of_covered_lifelines[j]).Get_connected_object_id()).Get_type()=="uml:Actor":
+                                list_of_covered_lifelines.pop(j)
+                            else:
+                                j+=1
+                        if len(list_of_covered_lifelines)==0 and list_of_objects[i].Get_type_alternative()=="alt":
+                            list_of_use_cases_diagrams=[]
+                            for j in range(0,len(self.model.Get_list_of_diagrams())):
+                                if self.model.Get_diagram(j).Get_type()=="Use Case diagram":
+                                    list_of_use_cases_diagrams.append(self.model.Get_diagram(j))
+                            current_use_case_diagram=None
+                            current_use_case=None
+                            for j in range(0,len(list_of_use_cases_diagrams)):
+                                list_of_use_case_diagram_objects=list_of_use_cases_diagrams[j].Get_list_of_objects()
+                                current_use_case_diagram=list_of_use_cases_diagrams[j]
+                                flag_exist=False
+                                for k in range(0,len(list_of_use_case_diagram_objects)):
+                                    if list_of_use_case_diagram_objects[k].Get_name()==self.name:
+                                        flag_exist=True
+                                        current_use_case=list_of_use_case_diagram_objects[k]
+                                        break
+                                if flag_exist==True:
+                                    break
+                            list_of_extentions=current_use_case.Get_list_of_extentions()
+                            flag_exist=False
+                            for j in range(0,len(list_of_extentions)):
+                                if list_of_extentions[j][0]==list_of_objects[i].Get_name():
+                                    flag_exist=True
+                                    break
+                            if flag_exist==False:
+                                self.model.Add_recomendation("It is recommended to add the extension '"+list_of_objects[i].Get_name()+"' to the use case '"+current_use_case.Get_name()+"' in the diagram '"+current_use_case_diagram.Get_name()+"'")
         return
   
 class obj_Class(Object):
