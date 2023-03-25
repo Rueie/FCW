@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>18008171-a470-4b73-82e4-7a00f3ea90ba</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>TEST.py</StartupFile>
+    <StartupFile>Procrust.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -22,13 +22,15 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="TEST.py" />
+    <Compile Include="Procrust.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="A lot of class diagrams in one project.xml" />
     <Content Include="A lot of posl diagrams in one project.xml" />
     <Content Include="A lot of pres diagrams in one project.xml" />
     <Content Include="Params.txt" />
+    <Content Include="Prom_comments.txt" />
+    <Content Include="Prom_xml.txt" />
     <Content Include="Procrust.xml" />
     <Content Include="Test diagram classes XML2.1.xml" />
     <Content Include="Three types of diagrams in one model.xml" />
