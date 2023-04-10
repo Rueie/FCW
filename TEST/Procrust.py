@@ -16,7 +16,7 @@ from threading import Thread
 from bs4 import BeautifulSoup
 from rnnmorph.predictor import RNNMorphPredictor
 
-coding_xml="utf-8"
+coding_xml="cp1251"
 coding_other_files="utf-8"
 file_name_with_param="Params.txt"
 file_with_prom_comments="Prom_comments.txt"
@@ -26,7 +26,7 @@ if platform.system()=="Linux":
 elif platform.system()=="Windows":
     file_path_with_params=os.path.dirname(os.path.abspath(__file__))+"\\"+file_name_with_param
     file_path_with_prom_comments=os.path.dirname(os.path.abspath(__file__))+"\\"+file_with_prom_comments
-predictor = RNNMorphPredictor(language="en")
+predictor = None
 
 class controller:
     def __init__(self):
@@ -69,7 +69,95 @@ class visual:
         self.thread1.start()
         
         self.number_rows_in_string_in_tree=1
+        self.size_of_text=11
+        self.size_of_titles=self.size_of_text+4
+        
+        self.max_number_of_strings_in_row=1
+        self.list_of_last_id_of_string=[]
         return
+    def wrap(self,string,column_width):
+        length=math.floor(column_width/self.size_of_text)
+        result_sting=""
+        counter=0
+        number_of_rows=1
+        for simv in string:
+            if counter==length:
+                counter=0
+                number_of_rows+=1
+                result_sting+='\n'
+            result_sting+=simv
+            counter+=1
+        if self.max_number_of_strings_in_row<number_of_rows:
+            self.max_number_of_strings_in_row=number_of_rows
+        return result_sting
+    def AddRow(self,message,tag):
+        group=self.wrap(message[0],math.floor(int(self.table_with_comments.column("group","width"))*1.35))
+        type=self.wrap(message[2],math.floor(int(self.table_with_comments.column("type","width"))*1.35))
+        info=self.wrap(message[1],math.floor(int(self.table_with_comments.column("info","width"))*1.45))
+        ids=""
+        for id in message[3]:
+            ids+=id+" "
+        if ids=="":
+            ids="None"
+        ids=self.wrap(ids,math.floor(int(self.table_with_comments.column("ids","width"))*1.35))
+        self.table_with_comments.insert("",END,values=(group,type,info,ids),tags=(tag))
+        self.style.configure('Table.Treeview',rowheight=self.local_font.metrics('linespace')*self.max_number_of_strings_in_row)
+        return
+    def ShowSolutionWindow(self,event):
+        for selected_item in self.table_with_comments.selection():
+            item=self.table_with_comments.item(selected_item)
+            data=item["values"]
+            self.window_with_solution=Toplevel()
+            self.window_with_solution.geometry(str(math.floor(self.main_window.winfo_screenwidth()/2))+"x"+str(math.floor(self.main_window.winfo_screenheight()/2)))
+            self.window_with_solution.resizable(width=False,height=False)     
+            
+            self.window_with_solution_label1=Label(self.window_with_solution,text=data[0])
+            self.window_with_solution_label1.pack(anchor=N)
+            
+            
+            self.window_with_solution_label2=Label(self.window_with_solution,text=data[1].replace("\n","")+":")
+            self.window_with_solution_label2.pack(anchor=NW)
+            
+            self.window_with_solution_text1=Text(self.window_with_solution,wrap="word",width=math.floor(self.window_with_solution.winfo_reqwidth()),height=self.max_number_of_strings_in_row)
+            self.window_with_solution_text1.insert(END,data[2].replace("\n",""))
+            self.window_with_solution_text1.pack(expand=False)
+            self.window_with_solution_text1["state"]="disabled"
+            
+            
+            self.window_with_solution_frame=Frame(self.window_with_solution,width=math.floor(self.window_with_solution.winfo_reqwidth()),height=math.floor(self.window_with_solution.winfo_reqheight()*0.85))
+            self.window_with_solution_frame.pack(expand=False)
+            
+            columns=("name","id")
+            self.window_with_solution_frame_table=ttk.Treeview(self.window_with_solution_frame,columns=columns,show="headings")
+            self.window_with_solution_frame_table.pack(expand=True,fill=BOTH,side=LEFT)
+            self.window_with_solution_frame_table.heading("name",text="Имя объекта")
+            self.window_with_solution_frame_table.heading("id",text="ID объекта")
+            self.window_with_solution_frame_table.column("0",stretch=False,width=math.floor(self.window_with_solution.winfo_reqwidth()*1.5),anchor=W)
+            self.window_with_solution_frame_table.column("1",stretch=False,width=math.floor(self.window_with_solution.winfo_reqwidth()*2.5),anchor=CENTER)
+            
+            self.window_with_solution_frame_table.tag_configure("first",background="#FFFFFF")
+            self.window_with_solution_frame_table.tag_configure("second",background="#EFEFEF")
+            
+            self.window_with_solution_frame_scrollbar=Scrollbar(self.window_with_solution_frame,orient="vertical",command=self.window_with_solution_frame_table.yview)
+            self.window_with_solution_frame_scrollbar.pack(side=RIGHT,anchor=E,fill="y")
+            self.window_with_solution_frame_table["yscrollcommand"] = self.window_with_solution_frame_scrollbar.set
+            
+            #print("<"+data[3]+">")
+            #print("<"+data[3].replace("\n","")+">")
+            list_of_ids=re.findall("([^ ]+)",data[3].replace("\n",""))
+            self.controller.AddCommand(["Model",["Предоставить данные об объектах",list_of_ids]])
+            
+            self.window_with_solution_button1=Button(self.window_with_solution,text="Решить проблему",background="#A7D5B7",width=math.floor(self.window_with_solution.winfo_reqwidth()*0.2),height=math.floor(self.window_with_solution.winfo_reqheight()*0.01),command=lambda:self.GetSolution(selected_item,data[1].replace("\n",""),data[2].replace("\n",""),list_of_ids))
+            self.window_with_solution_button1.pack(pady=math.floor(self.window_with_solution.winfo_reqheight()*0.05))
+            
+            self.window_with_solution.grab_set()
+    def GetSolution(self,index_of_string,type_of_solution,info,list_of_ids):
+        if self.table_with_comments.item(index_of_string)["tags"][0]!="success":
+            self.list_of_last_id_of_string.append([index_of_string,self.table_with_comments.item(index_of_string)["tags"]])
+            self.table_with_comments.item(index_of_string,tags="wait")
+            self.controller.AddCommand(["Model",["Решение проблемы",[type_of_solution,info,list_of_ids]]])
+        self.table_with_comments.selection_remove(index_of_string)
+        self.window_with_solution.destroy()
     def Start(self):
         #само окно
         #print("Поток визаульного интерфейса:",threading.current_thread())
@@ -139,14 +227,32 @@ class visual:
         self.result_page_label1=Label(self.result_page_frame_result,text="Рекомендации и предупреждения:")
         self.result_page_label1.pack(anchor=NW)
 
-        self.result_page_commetns_tracert=Text(self.result_page_frame_result,font="Times 11",wrap="word",height=math.floor(self.main_window.winfo_screenheight()/3/14))
-        self.result_page_commetns_tracert.pack(side=LEFT,expand=True,fill="both")
-        self.font_for_groups=font.Font(family="Times",size=14,weight="bold",slant="italic",underline=True)
-        self.result_page_commetns_tracert.tag_configure("Раздел",font=self.font_for_groups)
+        self.style=ttk.Style()
+        self.local_font=font.Font(family="Times",size=self.size_of_text)
+        self.style.configure("Table.Treeview",font=(self.local_font,self.size_of_text),foreground="#000000", padding=0, background="#FFFFFF")
 
-        self.result_page_commetns_tracert_ver_srollbar=Scrollbar(self.result_page_frame_result,orient="vertical",command=self.result_page_commetns_tracert.yview)
-        self.result_page_commetns_tracert_ver_srollbar.pack(side=RIGHT,anchor=E,fill="y")
-        self.result_page_commetns_tracert["yscrollcommand"] = self.result_page_commetns_tracert_ver_srollbar.set
+        self.columns_of_table_with_comments=("group","type","info","ids")
+        self.table_with_comments=ttk.Treeview(self.result_page_frame_result,columns=self.columns_of_table_with_comments,show="headings",style="Table.Treeview")
+        self.table_with_comments.pack(expand=True,fill=BOTH,side=LEFT)
+        self.table_with_comments.heading("group",text="Группа")
+        self.table_with_comments.heading("type",text="Тип")
+        self.table_with_comments.heading("info",text="Содержание")
+        self.table_with_comments.heading("ids",text="ID")
+        self.table_with_comments.column("0",stretch=False,width=math.floor(self.main_window.winfo_screenwidth()/10)-10,anchor=CENTER)
+        self.table_with_comments.column("1",stretch=False,width=math.floor(self.main_window.winfo_screenwidth()/10)-10,anchor=CENTER)
+        self.table_with_comments.column("2",stretch=False,width=math.floor(self.main_window.winfo_screenwidth()/10*6)-10,anchor=W)
+        self.table_with_comments.column("3",stretch=False,width=math.floor(self.main_window.winfo_screenwidth()/5)-10,anchor=CENTER)
+
+        self.table_with_comments.tag_configure("first",background="#FFFFFF")
+        self.table_with_comments.tag_configure("second",background="#EFEFEF")
+        self.table_with_comments.tag_configure("wait",background="#E2E27E")
+        self.table_with_comments.tag_configure("success",background="#A7D5B7")
+        
+        self.table_with_comments.bind("<<TreeviewSelect>>",self.ShowSolutionWindow)
+        
+        self.result_page_comments_table_scrollbar=Scrollbar(self.result_page_frame_result,orient="vertical",command=self.table_with_comments.yview)
+        self.result_page_comments_table_scrollbar.pack(side=RIGHT,anchor=E,fill="y")
+        self.table_with_comments["yscrollcommand"] = self.result_page_comments_table_scrollbar.set
         
         self.result_page_frame_tracert=Frame(self.result_page,height=math.floor(self.main_window.winfo_screenheight()/4),width=self.main_window.winfo_screenwidth())
         self.result_page_frame_tracert.pack(anchor=CENTER)
@@ -155,7 +261,7 @@ class visual:
         self.result_page_label2=Label(self.result_page_frame_tracert,text="Трассировка работы:")
         self.result_page_label2.pack(anchor=NW)
 
-        self.result_page_job_tracert=Text(self.result_page_frame_tracert)
+        self.result_page_job_tracert=Text(self.result_page_frame_tracert,font="Times "+str(self.size_of_text))
         self.result_page_job_tracert.pack(side=LEFT,expand=True, fill="both")
         
         self.result_page_job_tracert_scrollbar=Scrollbar(self.result_page_frame_tracert,orient="vertical",command=self.result_page_job_tracert.yview)
@@ -250,8 +356,43 @@ class visual:
             elif self.list_of_commands[0][0]=="Модель":
                 self.SetModel(self.list_of_commands[0][1])
                 self.result_page_start_button["state"]="normal"
+            elif self.list_of_commands[0][0]=="Установить объекты рекомендации":
+                counter=False
+                tag=""
+                for object in self.list_of_commands[0][1]:
+                    if counter==False:
+                        counter=True
+                        tag="first"
+                    else:
+                        counter=False
+                        tag="second"
+                    self.window_with_solution_frame_table.insert("",END,values=(self.wrap(object[0],int(self.window_with_solution_frame_table.column("name","width"))),self.wrap(object[1],int(self.window_with_solution_frame_table.column("id","width")))),tags=(tag))
+            elif self.list_of_commands[0][0]=="Результат выполнения операции":
+                if self.list_of_commands[0][1]=="Удача":
+                    self.table_with_comments.item(self.list_of_last_id_of_string[0][0],tags=("success"))
+                elif self.list_of_commands[0][1]=="Неудача":
+                    self.table_with_comments.item(self.list_of_last_id_of_string[0][0],tags=(self.list_of_last_id_of_string[0][1]))
+                    self.window_alert=Toplevel()
+                    self.window_alert.geometry(str(math.floor(self.main_window.winfo_screenwidth()*0.25))+"x"+str(math.floor(self.main_window.winfo_screenheight()*0.1)))
+                    self.window_alert.resizable(width=False,height=False)
+                    
+                    self.window_alert_label=Label(self.window_alert,text="Данный механизм не имеет реализации решения")
+                    self.window_alert_label.pack(anchor=CENTER)
+                    
+                    self.window_alert.grab_set()
+                elif self.list_of_commands[0][1]=="Ошибка":
+                    self.table_with_comments.item(self.list_of_last_id_of_string[0][0],tags=(self.list_of_last_id_of_string[0][1]))
+                    self.window_alert=Toplevel()
+                    self.window_alert.geometry(str(math.floor(self.main_window.winfo_screenwidth()*0.25))+"x"+str(math.floor(self.main_window.winfo_screenheight()*0.1)))
+                    self.window_alert.resizable(width=False,height=False)
+                    
+                    self.window_alert_label=Label(self.window_alert,text="В работе данного механизма возникла ошибка")
+                    self.window_alert_label.pack(anchor=CENTER)
+                    
+                    self.window_alert.grab_set()
+                self.list_of_last_id_of_string.pop(0)
             self.list_of_commands.pop(0)
-        self.main_window.after(10,self.CheckCommands)
+        self.main_window.after(1,self.CheckCommands)
     def SetModel(self,list_of_objects):
         count=0
         self.tracert_page_tree.insert("",END,iid=count,text=list_of_objects[0])
@@ -266,13 +407,20 @@ class visual:
                 max_number=self.AddBranch(list_of_objects[i][1],max_number,max_number)
         return max_number
     def SetRecommendations(self,list_of_recomendations):
-        self.result_page_commetns_tracert["state"]="normal"
+        counter=False
         for group in list_of_recomendations:
-            self.result_page_commetns_tracert.insert(END,group[0]+":\n","Раздел")
             for recomendation in group[1]:
-                self.result_page_commetns_tracert.insert(END,"-->"+recomendation+"\n")
-        self.result_page_commetns_tracert["state"]="disabled"
-        return
+                curr_comment=[group[0]]
+                curr_comment.append(recomendation[0])
+                curr_comment.append(recomendation[1])
+                curr_comment.append(recomendation[2])
+                if counter==False:
+                    counter=True
+                    tag="first"
+                else:
+                    counter=False
+                    tag="second"
+                self.AddRow(curr_comment,tag)
     def LogIn(self):
         if self.number_of_login_windows==0:
             self.number_of_login_windows+=1
@@ -343,7 +491,8 @@ class visual:
         self.pages.tab(2,state="normal")
         for i in self.tracert_page_tree.get_children():
             self.tracert_page_tree.delete(i)
-        self.result_page_commetns_tracert.delete('1.0',END)
+        for item in self.table_with_comments.get_children():
+            self.table_with_comments.delete(item)
         self.pages.tab(2,state="disabled")
         if file_path!="":
             check_format=""
@@ -359,18 +508,7 @@ class visual:
                 self.files_page_text_from_file['state']='normal'
                 self.files_page_text_from_file.delete("0.0",END)
                 xml_file=open(file_path, "r",encoding=coding_xml)
-                while True:
-                    line=xml_file.readline()
-                    check_format=""
-                    for i in range(0,len(line)):
-                        if line[i]==' ':
-                            break
-                        else:
-                            check_format+=line[i]
-                    if check_format=="	<xmi:Extension":
-                        break
-                    else:
-                        self.files_page_text_from_file.insert(END,line)
+                self.files_page_text_from_file.insert(END,xml_file.read())
                 self.files_page_text_from_file["state"]='disabled'
                 self.pages.tab(1,state='normal')
                 self.number_of_opened_frames=2
@@ -411,7 +549,8 @@ class visual:
         self.result_page_job_tracert["state"]="disabled"
         for i in self.tracert_page_tree.get_children():
             self.tracert_page_tree.delete(i)
-        self.result_page_commetns_tracert.delete('1.0',END)
+        for item in self.table_with_comments.get_children():
+            self.table_with_comments.delete(item)
         mess=["Выбранные паттерны и механизмы"]
         for i in range(0,len(self.list_of_patt_and_mech)):
             mess.append([self.list_of_patt_and_mech[i][0]["text"],self.list_of_patt_and_mech[i][1].get()])
@@ -425,15 +564,15 @@ class visual:
             self.thread1.join()
     
 class Object:
-    id=""
-    type=""
-    name=""
+    id="None"
+    type="None"
+    name="None"
     parents_id=[]#A list of strings
     def __init__(self):
-        self.id=""
-        self.type=""
-        self.name=""
-        self.parents_id=[]
+        self.id="None"
+        self.type="None"
+        self.name="None"
+        self.parents_id=[]#A list of strings
         return
     def Set_id(self,new_id):
         self.id=new_id
@@ -475,10 +614,14 @@ class Object:
    
 class Model(Object):
     def __init__(self,init_controller):
+        self.xml_file_path=None
+        self.xml_root=None
+        self.model_root=None
+        self.extention_root=None
         self.controller=init_controller
         self.list_of_commands=[]
         self.list_of_diagrams=[]#List of obj_Diagram type objects
-        self.list_of_recomendations=[]#[[группа замечаний,[рекомендации и замечания]],...,[группа замечаний,[рекомендации и замечания]]]
+        self.list_of_recomendations=[]#[[группа замечаний,[[замечание,тип замечания,[список id, совпадающий с объектами в кавычках]],...,[замечание,тип замечания,[[список id, совпадающий с объектами в кавычках]]]]],...,[группа замечаний,[...]]]
         self.list_of_patterns_and_mechanisms_from_file=[]
         file_with_params=open(file_path_with_params,"r",encoding=coding_other_files)
         while True:
@@ -501,6 +644,14 @@ class Model(Object):
         self.thread1=Thread(target=self.CheckCommands,args=())
         self.thread1.start()
         return
+    def SetRoots(self,root):
+        self.xml_root=root
+        self.model_root=self.xml_root.find("uml:Model")
+        self.extention_root=self.xml_root.find("xmi:Extension")
+    def ResetXMLFile(self):
+        file=open(self.xml_file_path,"w",encoding=coding_other_files)
+        file.write(self.xml_root.prettify(formatter="minimal"))
+        file.close()
     def Add_diagram(self,new_diagram):
         self.list_of_diagrams.append(new_diagram)
         return
@@ -516,26 +667,15 @@ class Model(Object):
             if self.list_of_diagrams[i].Find_object(object_id)!=None:
                 return self.list_of_diagrams[i].Find_object(object_id)
         return None
-    def Add_recomendation(self,new_recomendation,group_of_recommendation):
-        flag_exist=False
-        curr_group=None
+    def Add_recomendation(self,new_recomendation,group_of_recommendation,type_comment,list_of_id):
         for group in self.list_of_recomendations:
             if group[0]==group_of_recommendation:
-                flag_exist=True
-                curr_group=group
-                break
-        if flag_exist==True:
-            flag_exist=False
-            for recomendation in curr_group[1]:
-                if recomendation==new_recomendation:
-                    flag_exist=True
-                    break
-            if flag_exist==False:
-                curr_group[1].append(new_recomendation)
-        else:
-            new_group=[group_of_recommendation,[]]
-            new_group[1].append(new_recomendation)
-            self.list_of_recomendations.append(new_group)
+                for comment in group[1]:
+                    if comment[0]==new_recomendation:
+                        return
+                group[1].append([new_recomendation,type_comment,list_of_id])
+                return
+        self.list_of_recomendations.append([group_of_recommendation,[[new_recomendation,type_comment,list_of_id]]])
     def Get_recomendation(self,number_of_recomendation):
         if number_of_recomendation<0 or number_of_recomendation>=len(self.list_of_recomendations):
             return None
@@ -545,21 +685,19 @@ class Model(Object):
         return self.list_of_recomendations
     def Parse_Model(self,path_of_xml_file):
         self.controller.AddCommand(["Visual","Начался процесс чтения и анализа модели"])
-        with open(path_of_xml_file,encoding= 'unicode_escape') as fp:
-            root=BeautifulSoup(fp,features="lxml")
-        local_root=root
-        for child in local_root.descendants:
-            if child.name=="packagedelement":
-                local_root=child
-                break
-        self.Set_name(local_root["name"])
-        counter=1
-        for child in local_root.children:
+        self.xml_file_path=path_of_xml_file
+        xml_file=open(path_of_xml_file,"r",encoding=coding_xml)
+        xml_tree=BeautifulSoup(xml_file,"xml")
+        xml_file.close()
+        self.SetRoots(xml_tree)
+        model_package=xml_tree.find("uml:Model")
+        model_data=model_package.find("packagedElement")
+        counter=0
+        self.name=model_data["name"]
+        for child in model_data.children:
             if child!='\n':
                 counter+=1
                 our_diagram=obj_Diagram(self)
-                our_diagram.Set_name(child["name"])
-                self.controller.AddCommand(["Visual",["Информация о процессе 1","Идёт чтение диаграммы <"+our_diagram.Get_name()+">","Обычный"]])
                 self.controller.AddCommand(["Visual",["Состояние прогресса",counter,100]])
                 our_diagram.Parse_diaram(child)
                 self.Add_diagram(our_diagram)
@@ -567,7 +705,6 @@ class Model(Object):
         self.Completion_of_the_Model_formation()
         self.controller.AddCommand(["Visual",["Информация о процессе 1","Завершено чтение и формирование представления модели <"+self.Get_name()+">","Финальный"]])
         self.Search_for_recommendations()
-        #print("Закончили парсинг модели")
         self.controller.AddCommand(["Visual","Закончился процесс чтения и анализа модели"])
         self.SendModel()
         self.SendRecommenadions()
@@ -584,7 +721,7 @@ class Model(Object):
             for i in range(0,len(our_list_of_objects)):
                 object_mess=[]
                 data_object_mess=[]
-                if our_list_of_objects[i].Get_type()=="uml:Class" or our_list_of_objects[i].Get_type()=="uml:Component" or our_list_of_objects[i].Get_type()=="uml:Interface" or our_list_of_objects[i].Get_type()=="uml:AssociationClass":
+                if our_list_of_objects[i].Get_type()=="uml:Class" or our_list_of_objects[i].Get_type()=="uml:Component" or our_list_of_objects[i].Get_type()=="uml:Interface" or our_list_of_objects[i].Get_type()=="uml:AssociationClass" or our_list_of_objects[i].Get_type()=="uml:Boundary":
                     object_mess.append(our_list_of_objects[i].Get_name())
                     data_object_mess.append("Тип объекта: "+our_list_of_objects[i].Get_type())
                     data_object_mess.append("ID объекта: "+our_list_of_objects[i].Get_id())
@@ -626,11 +763,11 @@ class Model(Object):
                     if our_funcs==[]:
                         data_object_mess.append("Функции: нет")
                     else:
+                        #print(our_funcs)
                         func_mess=[]
                         func_mess.append("Функции")
                         data_func_mess=[]
                         for j in range(0,len(our_funcs)):
-                            data_func_mess.clear()
                             curr_func_mess=[]
                             curr_func_mess.append(our_funcs[j][2])
                             data_curr_func_mess=[]
@@ -643,8 +780,7 @@ class Model(Object):
                                 params_mess.append("Параметры")
                                 data_params_mess=[]
                                 for l in range(3,len(our_funcs[j]),2):
-                                    data_params_mess.clear()
-                                    data_params_mess.append(our_funcs[j][l+1])
+                                    data_params_mess.append("Имя параметра:"+our_funcs[j][l+1])
                                     data_params_mess.append("Тип параметра: "+our_funcs[j][l])
                                 params_mess.append(data_params_mess)
                                 data_curr_func_mess.append(params_mess)
@@ -654,7 +790,7 @@ class Model(Object):
                         data_object_mess.append(func_mess)
                     object_mess.append(data_object_mess)
                     data_diagram_mess.append(object_mess)
-                if our_list_of_objects[i].Get_type()=="uml:Association" or our_list_of_objects[i].Get_type()=="uml:Composition" or our_list_of_objects[i].Get_type()=="uml:Aggregation" or our_list_of_objects[i].Get_type()=="uml:Dependency" or our_list_of_objects[i].Get_type()=="uml:Realization":
+                if our_list_of_objects[i].Get_type()=="uml:Association" or our_list_of_objects[i].Get_type()=="uml:Dependency" or our_list_of_objects[i].Get_type()=="uml:Realization" or our_list_of_objects[i].Get_type()=="uml:Composition" or our_list_of_objects[i].Get_type()=="uml:Aggregation":
                     if our_list_of_objects[i].Get_name()=="None":
                         our_name=""
                         our_name+=self.Find_object_in_Model(our_list_of_objects[i].Get_sender_class_id()).Get_name()+"->"+self.Find_object_in_Model(our_list_of_objects[i].Get_recipient_class_id()).Get_name()
@@ -666,12 +802,12 @@ class Model(Object):
                     data_object_mess.append("ID отправителя: "+our_list_of_objects[i].Get_sender_class_id()+"("+str(self.Find_object_in_Model(our_list_of_objects[i].Get_sender_class_id()).Get_name())+")")
                     data_object_mess.append("Роль отправителя: "+our_list_of_objects[i].Get_role_sender())
                     current_string="Кратность отправителя: "
-                    current_string+=our_list_of_objects[i].Take_type_string_from_type_number(our_list_of_objects[i].Get_type_of_the_number_of_sender_class())
+                    current_string+=our_list_of_objects[i].Get_multiplicity_of_sender_class()
                     data_object_mess.append(current_string)
                     data_object_mess.append("ID получателя: "+our_list_of_objects[i].Get_recipient_class_id()+"("+str(self.Find_object_in_Model(our_list_of_objects[i].Get_recipient_class_id()).Get_name())+")")
                     data_object_mess.append("Роль получателя: "+our_list_of_objects[i].Get_role_recipient())
                     current_string="Кратность получателя: "
-                    current_string+=our_list_of_objects[i].Take_type_string_from_type_number(our_list_of_objects[i].Get_type_of_the_number_of_recipient_class())
+                    current_string+=our_list_of_objects[i].Get_multiplicity_of_recipient_class()
                     data_object_mess.append(current_string)
                     object_mess.append(data_object_mess)
                     data_diagram_mess.append(object_mess)
@@ -755,7 +891,7 @@ class Model(Object):
                         data_object_mess.append(extends_mess)
                     object_mess.append(data_object_mess)
                     data_diagram_mess.append(object_mess)
-                if our_list_of_objects[i].Get_type()=="System boundary":
+                if our_list_of_objects[i].Get_type()=="uml:Boundary":
                     object_mess.append(our_list_of_objects[i].Get_name())
                     data_object_mess.append("Тип объекта: "+our_list_of_objects[i].Get_type())
                     object_mess.append(data_object_mess)
@@ -779,8 +915,14 @@ class Model(Object):
                         object_mess.append(our_list_of_objects[i].Get_name())
                     data_object_mess.append("Тип объекта: "+our_list_of_objects[i].Get_type())
                     data_object_mess.append("ID: "+our_list_of_objects[i].Get_id())
-                    data_object_mess.append("ID временной линии, вызывающей данную процедуру: "+our_list_of_objects[i].Get_id_point_from()+"("+self.Find_object_in_Model(our_list_of_objects[i].Get_id_point_from()).Get_name()+")")
-                    data_object_mess.append("ID временной линии, в которой вызывается данная процедура: "+our_list_of_objects[i].Get_id_point_to()+"("+self.Find_object_in_Model(our_list_of_objects[i].Get_id_point_to()).Get_name()+")")
+                    if self.Find_object_in_Model(our_list_of_objects[i].Get_id_point_from())!=None:
+                        data_object_mess.append("ID временной линии или объекта, вызывающей данную процедуру: "+our_list_of_objects[i].Get_id_point_from()+"("+self.Find_object_in_Model(our_list_of_objects[i].Get_id_point_from()).Get_name()+")")
+                    else:
+                        data_object_mess.append("ID временной линии или объекта, вызывающей данную процедуру: "+our_list_of_objects[i].Get_id_point_from())
+                    if self.Find_object_in_Model(our_list_of_objects[i].Get_id_point_to())!=None:
+                        data_object_mess.append("ID временной линии, в которой вызывается данная процедура: "+our_list_of_objects[i].Get_id_point_to()+"("+self.Find_object_in_Model(our_list_of_objects[i].Get_id_point_to()).Get_name()+")")
+                    else:
+                        data_object_mess.append("ID временной линии, в которой вызывается данная процедура: "+our_list_of_objects[i].Get_id_point_to())
                     data_object_mess.append("Тип вызова: "+our_list_of_objects[i].Get_type_connection())
                     data_object_mess.append("Вид вызова: "+our_list_of_objects[i].Get_kind_connection())
                     object_mess.append(data_object_mess)
@@ -817,8 +959,11 @@ class Model(Object):
             diagram_mess.append(data_diagram_mess)
             data_mess.append(diagram_mess)
         mess.append(data_mess)
+        #print(mess)
         self.controller.AddCommand(["Visual",["Модель",mess]])
     def SendRecommenadions(self):
+        for group in self.list_of_recomendations:
+            group[1].sort()
         self.controller.AddCommand(["Visual",["Рекомендации и замечания",self.list_of_recomendations]])
     def Completion_of_the_Model_formation(self):
         for i in range(0,len(self.list_of_diagrams)):
@@ -832,20 +977,20 @@ class Model(Object):
         flag_use_case=False
         flag_sequnce=False
         for i in range(0,len(self.list_of_diagrams)):
-            if self.list_of_diagrams[i].Get_type()=="Class diagram":
+            if self.list_of_diagrams[i].Get_type()=="Logical":
                 flag_class=True
-            elif self.list_of_diagrams[i].Get_type()=="Use Case diagram":
+            elif self.list_of_diagrams[i].Get_type()=="Use Case":
                 flag_use_case=True
-            elif self.list_of_diagrams[i].Get_type()=="Sequence diagram":
+            elif self.list_of_diagrams[i].Get_type()=="Sequence":
                 flag_sequnce=True
             if flag_class==True and flag_use_case==True and flag_sequnce==True:
                 break
         if flag_class==False:
-            self.Add_recomendation("В модели нет диаграмм классов, из-за чего невозможно поддерживать полноту модели и её детальность","Полнота модели")
+            self.Add_recomendation("В модели нет диаграмм классов, из-за чего невозможно поддерживать полноту модели и её детальность","Полнота модели","None",[])
         if flag_use_case==False:
-            self.Add_recomendation("В модели нет диаграмм прецедентов, из-за чего нет возможности получить данные о взаимодействиях в системе и актеров, которые влияют на систему","Полнота модели")
+            self.Add_recomendation("В модели нет диаграмм прецедентов, из-за чего нет возможности получить данные о взаимодействиях в системе и актеров, которые влияют на систему","Полнота модели","None",[])
         if flag_sequnce==False:
-            self.Add_recomendation("В модели нет диаграмм ситемных взаимодействий, из-за чего нет возможности детализировать существующие диаграммы классов","Полнота модели")
+            self.Add_recomendation("В модели нет диаграмм ситемных взаимодействий, из-за чего нет возможности детализировать существующие диаграммы классов","Полнота модели","None",[])
         #сама ванильная проверка
         counter=0
         for diagram in self.list_of_diagrams:
@@ -862,14 +1007,16 @@ class Model(Object):
         self.SaveComments()
         return
     def SaveComments(self):
-        file_with_comm=open(file_path_with_prom_comments,"w")
+        file_with_comm=open(file_path_with_prom_comments,"w",encoding=coding_other_files)
+        #print(self.list_of_recomendations)
         for group in self.list_of_recomendations:
             for recommendation in group[1]:
-                list_of_objects=re.findall('\'[\d\w ]*\'',recommendation)
-                new_string=group[0]+"/"+recommendation+"/?!#"
+                list_of_objects=re.findall('\'[\d\w ]*\'',recommendation[0])
+                new_string=group[0]+"/"+recommendation[0]+"/?!#"
                 for object in list_of_objects:
                     new_string+=object+","
-                new_string=new_string[0:-1]
+                if new_string[-1]!="#":
+                    new_string=new_string[0:-1]
                 new_string+="#!?\n"
                 file_with_comm.write(new_string)
         return
@@ -903,7 +1050,7 @@ class Model(Object):
                                 break
                     #print(self.list_of_patterns_and_mechanisms_from_file)
                     old_file=open(file_path_with_params,"r",encoding=coding_other_files)
-                    new_file=open(file_path_with_params+str(1),"w")
+                    new_file=open(file_path_with_params+str(1),"w",encoding=coding_other_files)
                     while True:
                         line=old_file.readline()
                         if not line:
@@ -948,6 +1095,17 @@ class Model(Object):
                                 self.list_of_patterns_and_mechanisms_from_file[i].append(list_of_model_functions[j][1])
                             else:
                                 self.list_of_patterns_and_mechanisms_from_file[i][5]=list_of_model_functions[j][1]
+                elif self.list_of_commands[0][0]=="Предоставить данные об объектах":
+                    new_list_of_objects=[]
+                    for id in self.list_of_commands[0][1]:
+                        if self.Find_object_in_Model(id)!=None:
+                            new_object=[]
+                            new_object.append(self.Find_object_in_Model(id).name)
+                            new_object.append(id)
+                            new_list_of_objects.append(new_object)
+                    self.controller.AddCommand(["Visual",["Установить объекты рекомендации",new_list_of_objects]])
+                elif self.list_of_commands[0][0]=="Решение проблемы":
+                    self.GetSolution(self.list_of_commands[0][1])
                 self.list_of_commands.pop(0)
             else:
                 time.sleep(0.1)
@@ -965,7 +1123,7 @@ class Model(Object):
         name=re.search('<.*,.* (\w*)>',str(traceback.extract_stack()[-1])).group(1).replace("_"," ")
         for diagram in self.list_of_diagrams:
             counter+=1
-            if diagram.Get_type()=="Use Case diagram":
+            if diagram.Get_type()=="Use Case":
                 self.controller.AddCommand(["Visual",["Информация о процессе 2","Работа механизма <"+name+"> в диаграмме <"+diagram.Get_name()+">","Обычный"]])
                 diagram.Offering_classes_on_frequently_repeated_nouns_in_use_cases()
             self.controller.AddCommand(["Visual",["Состояние прогресса",counter,len(self.list_of_diagrams)]])
@@ -1016,22 +1174,19 @@ class Model(Object):
                     old_list_of_comments.append([curr_object,[[curr_comm,curr_type]]])
                 else:
                     founded_group[1].append([curr_comm,curr_type])
-        #for group in old_list_of_comments:
-            #print(group)
-        #print("_______________________________________________________________")
         for group in self.list_of_recomendations:
             if group[0]!=this_name_of_group_recomendation:
                 for recomendation in group[1]:
                     flag_exist=False
                     for objects_group in old_list_of_comments:
                         for comments in  objects_group[1]:
-                            if recomendation==comments[0]:
+                            if recomendation[0]==comments[0]:
                                 flag_exist=True
                                 break
                         if flag_exist==True:
                             break
                     if flag_exist==True:
-                        new_list_of_objects=re.findall("'([ _a-zA-Z0-9'^]*)'",recomendation)
+                        new_list_of_objects=re.findall("'([ _a-zA-Z0-9'^]*)'",recomendation[0])
                         #print(new_list_of_objects)
                         list_of_group_objects=[]#[имя лбъекта, список старых замечаний с этим именем объект, список старых замечаний с этим именем объекта]
                         for object in new_list_of_objects:
@@ -1052,11 +1207,11 @@ class Model(Object):
                                 #print(curr_group[0])
                                 if curr_group[0]!=this_name_of_group_recomendation:
                                     for curr_recomendation in curr_group[1]:
-                                        curr_objects_list=re.findall("'([ _a-zA-Z0-9'^]*)'",curr_recomendation)
+                                        curr_objects_list=re.findall("'([ _a-zA-Z0-9'^]*)'",curr_recomendation[0])
                                         for curr_objects in curr_objects_list:
                                            #t(curr_objects,"?",object)
                                             if curr_objects==object:
-                                                list_of_group_objects[-1][-1].append(curr_recomendation)
+                                                list_of_group_objects[-1][-1].append(curr_recomendation[0])
                                                 break
                         count_old=0
                         count_new=0
@@ -1074,23 +1229,69 @@ class Model(Object):
                                     flag_same=False
                                     break
                             if flag_same==True:
-                                self.Add_recomendation("Предложенная рекоммендация:<"+recomendation+">была проигнорирована, в дальнейшем возможны конфликты и ошибки",this_name_of_group_recomendation)
+                                self.Add_recomendation("Предложенная рекоммендация:<"+recomendation[0]+">была проигнорирована, в дальнейшем возможны конфликты и ошибки",this_name_of_group_recomendation,"None",[])
                         if count_new>count_old:
-                            self.Add_recomendation("Предложенная рекоммендация:<"+recomendation+">была проигнорирована, обратите внимание, что возникли новые рекомендации, связанные с данным объектом или диаграммой",this_name_of_group_recomendation)
+                            self.Add_recomendation("Предложенная рекоммендация:<"+recomendation[0]+">была проигнорирована, обратите внимание, что возникли новые рекомендации, связанные с данным объектом или диаграммой",this_name_of_group_recomendation,"None",[])
         self.controller.AddCommand(["Visual",["Состояние прогресса",1,1]])
+        return
+    def GetSolution(self,data):
+        if data[0]=="Вынос функции в родителя":
+            list_of_names=re.findall("('[ a-zA-Z0-9]+')",data[1])
+            function_name=list_of_names[0][1:-1]
+            curr_diagram=self.Find_object_in_Model(data[2][0])
+            parent_class=self.Find_object_in_Model(data[2][len(data[2])-1])
+            list_of_childs=[]
+            for i in range(1,len(data[2])-1):
+                list_of_childs.append(self.Find_object_in_Model(data[2][i]))
+            parent_node=self.model_root.find("packagedElement",attrs={"xmi:id":parent_class.id})
+            parent_help_node=self.extention_root.find("element",attrs={"xmi:idref":parent_class.id})
+            if parent_node!=None and parent_help_node!=None:
+                for child in list_of_childs:
+                    if not self.model_root.find("packagedElement",attrs={"xmi:id":child.id}) or not self.extention_root.find("element",attrs={"xmi:idref":child.id}) or not self.model_root.find("packagedElement",attrs={"xmi:id":child.id}).find("ownedOperation",attrs={"name":function_name}) or not self.extention_root.find("element",attrs={"xmi:idref":child.id}).find("operation",attrs={"name":function_name}):
+                        self.controller.AddCommand(["Visual",["Результат выполнения операции","Ошибка"]])
+                        return
+                first_child=self.model_root.find("packagedElement",attrs={"xmi:id":list_of_childs[0].id})
+                first_child_help=self.extention_root.find("element",attrs={"xmi:idref":list_of_childs[0].id})
+                if first_child.find("ownedOperation",attrs={"name":function_name}) and first_child.find("ownedOperation",attrs={"name":function_name}).has_attr("xmi:id") and first_child_help.find("operation",attrs={"xmi:idref":first_child.find("ownedOperation",attrs={"name":function_name})["xmi:id"]}):
+                    operation=first_child.find("ownedOperation",attrs={"name":function_name})
+                    operation_help=first_child_help.find("operation",attrs={"xmi:idref":first_child.find("ownedOperation",attrs={"name":function_name})["xmi:id"]})
+                    parent_node.append(BeautifulSoup(str(operation),"xml"))
+                    if not parent_help_node.find("operations"):
+                        new_tag=BeautifulSoup(str(parent_help_node),"xml").new_tag("operations")
+                        parent_help_node.append(new_tag)
+                    parent_help_node.operations.append(BeautifulSoup(str(operation_help),"xml"))
+                    for child in list_of_childs:
+                        curr_child=self.model_root.find("packagedElement",attrs={"xmi:id":child.id})
+                        curr_child_help=self.extention_root.find("element",attrs={"xmi:idref":child.id})
+                        curr_child.find("ownedOperation",attrs={"name":function_name}).decompose()
+                        curr_child_help.find("operation",attrs={"name":function_name}).decompose()                        
+                        flag_exist=False
+                        for tag in curr_child_help.operations:
+                            if tag!="\n":
+                                flag_exist=True
+                                break
+                        if flag_exist==False:
+                            curr_child_help.operations.decompose()
+                    self.ResetXMLFile()
+                else:
+                    self.controller.AddCommand(["Visual",["Результат выполнения операции","Ошибка"]])
+                    return
+            else:
+                self.controller.AddCommand(["Visual",["Результат выполнения операции","Ошибка"]])
+                return
+            self.controller.AddCommand(["Visual",["Результат выполнения операции","Удача"]])
+        else:
+            self.controller.AddCommand(["Visual",["Результат выполнения операции","Неудача"]])
         return
 
 class obj_Diagram(Object):
-    list_of_objects=[]
-    model=None
-    list_of_nouns=[]#[[сущевтвительное,число повторений существительного],...,[сущевтвительное,число повторений существительного]]
-    list_of_verbs=[]#[[глагол,имя объекта-родителя этого глагола],...,[глагол,имя объекта-родителя этого глагола]]
     def __init__(self,init_model):
         self.list_of_objects=[]
         self.model=init_model
-        self.list_of_nouns=[]
-        self.list_of_verbs=[]
+        self.list_of_nouns=[]#[[сущевтвительное,число повторений существительного],...,[сущевтвительное,число повторений существительного]]
+        self.list_of_verbs=[]#[[глагол,имя объекта-родителя этого глагола],...,[глагол,имя объекта-родителя этого глагола]]
         self.model.Find_object_in_Model
+        super().__init__()
         return
     def Add_object(self,new_object):
         self.list_of_objects.append(new_object)
@@ -1112,49 +1313,12 @@ class obj_Diagram(Object):
     def Get_list_of_objects(self):
         return self.list_of_objects
     def Find_object(self,object_id):
+        if object_id==self.id:
+            return self
         for i in range(0,len(self.list_of_objects)):
             if self.list_of_objects[i].Get_id()==object_id:
                 return self.list_of_objects[i]
         return None
-    def Define_the_diagram_type(self):
-        list_of_types=[]
-        flag_unic=True
-        for i in range(0,len(self.list_of_objects)):
-            for j in range(0,len(list_of_types)):
-                if list_of_types[j]==self.list_of_objects[i].Get_type():
-                    flag_unic=False
-            if flag_unic==True:
-                list_of_types.append(self.list_of_objects[i].Get_type())
-            flag_unic=True
-        flag_actor=False
-        flag_use_case=False
-        flag_life_line=False
-        for i in range(0,len(list_of_types)):
-            if list_of_types[i]=="uml:UseCase":
-                flag_use_case=True
-            if list_of_types[i]=="uml:Actor":
-                flag_actor==True
-            if list_of_types[i]=="uml:Lifeline":
-                flag_life_line=True
-        if len(self.list_of_objects)==0:
-            list_of_use_case=[]
-            for i in range(0,len(self.model.Get_list_of_diagrams())):
-                current_list_of_objects=self.model.Get_diagram(i).Get_list_of_objects()
-                for j in range(0,len(current_list_of_objects)):
-                    if current_list_of_objects[j].Get_type()=="uml:UseCase":
-                        list_of_use_case.append(current_list_of_objects[j])
-            for i in range(0,len(list_of_use_case)):
-                if list_of_use_case[i].Get_name()==self.name:
-                    flag_life_line=True
-        if flag_life_line==True:
-            self.Set_type("Sequence diagram")
-        elif flag_use_case==True:
-            self.Set_type("Use Case diagram")
-        elif flag_actor==False:
-            self.Set_type("Class diagram")
-        else:
-            self.Set_type("Use Case diagram")
-        return
     def Get_nouns_and_verbs_from_words(self,object):
         words=[]
         begin=0
@@ -1223,324 +1387,120 @@ class obj_Diagram(Object):
         return
     def Parse_diaram(self,root):
         local_root=root
-        for child in local_root.descendants:
-            if child!="\n":
-                if child.name=="xmi:Extension":
-                    break
-                elif child.name=="packagedelement" or child.name=="nestedclassifier" or child.name=="lifeline" or child.name=="message" or child.name=="fragment" or child.name=="ownedattribute" or child.name=="ownedcomment":
-                    if child["xmi:type"]=="uml:Class" or child["xmi:type"]=="uml:Component" or child["xmi:type"]=="uml:Interface" or child["xmi:type"]=="uml:AssociationClass":
-                        new_obj_class=obj_Class()
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+" '"+child["name"]+"' начал читаться из XML файла"]])
-                        new_obj_class.Set_id(child["xmi:id"])
-                        new_obj_class.Set_name(child["name"])
-                        new_obj_class.Set_type(child["xmi:type"])
-                        new_obj_class.Parse_class(child)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+" '"+child["name"]+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+" '"+child["name"]+"' добавляется в модель"]])
-                        self.Add_object(new_obj_class)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+" '"+child["name"]+"' добавлен в модель"]])
-                        del new_obj_class
-                    if child["xmi:type"]=="uml:Association":
-                        tracert_string="Association '"+child["xmi:id"]
-                        if child.has_attr("name"):
-                            tracert_string+="("+child["name"]+")"
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",tracert_string+"' начал читаться из XML файла"]])
-                        new_obj_connection=obj_Connection()
-                        new_obj_connection.Set_id(child["xmi:id"])
-                        if child.has_attr("name"):
-                            new_obj_connection.Set_name(child["name"])
-                        else:
-                            new_obj_connection.Set_name("None")
-                        new_obj_connection.Set_type(child["xmi:type"])
-                        new_obj_connection.Parse_connection(child)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",tracert_string+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",tracert_string+"' добавляется в модель"]])
-                        self.Add_object(new_obj_connection)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",tracert_string+"' добавлен в модель"]])
-                        del new_obj_connection
-                    if child["xmi:type"]=="uml:UseCase":
-                        new_use_case=obj_Use_Case()
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' начал читаться из XML файла"]])
-                        new_use_case.Set_id(child["xmi:id"])
-                        new_use_case.Set_name(child["name"])
-                        new_use_case.Set_type(child["xmi:type"])
-                        new_use_case.Parse_use_case(child)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавляется в модель"]])
-                        self.Add_object(new_use_case)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавлен в модель"]])
-                        del new_use_case
-                    if child["xmi:type"]=="uml:Actor":
-                        new_actor=Object()
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' начал читаться из XML файла"]])
-                        new_actor.Set_name(child["name"])
-                        new_actor.Set_id(child["xmi:id"])
-                        new_actor.Set_type(child["xmi:type"])
-                        if len(child.contents)!=0:
-                           for i in range(0,len(child.contents)):
-                            if child.contents[i].name=="generalization":
-                                new_actor.Add_parents(child.contents[i]["general"])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавляется в модель"]])
-                        self.Add_object(new_actor)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавлен в модель"]])
-                        del new_actor
-                    if child["xmi:type"]=="uml:Lifeline":
-                        new_obj_lifeLine=obj_LifeLine()
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' начал читаться из XML файла"]])
-                        new_obj_lifeLine.Set_id(child["xmi:id"])
-                        new_obj_lifeLine.Set_type(child["xmi:type"])
-                        new_obj_lifeLine.Set_name(child["name"])
-                        new_obj_lifeLine.Set_connected_object_id(child["represents"])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавляется в модель"]])
-                        self.Add_object(new_obj_lifeLine)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавлен в модель"]])
-                        del new_obj_lifeLine
-                    if child["xmi:type"]=="uml:OccurrenceSpecification":
-                        our_point=Object()
-                        our_point.Set_id(child["xmi:id"])
-                        our_point.Set_type(child["xmi:type"])
-                        our_point.Set_name(child["covered"])
-                        self.Add_object(our_point)
-                        del our_point
-                    if child["xmi:type"]=="uml:Message":
-                        our_obj_time_connection=obj_Time_connection()
-                        current_name=""
-                        if child.has_attr("name")==True:
-                            current_name=child["name"]
-                        else:
-                            current_name=child["xmi:id"]
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+current_name+"' начал читаться из XML файла"]])
-                        our_obj_time_connection.Set_type(child["xmi:type"])
-                        our_obj_time_connection.Set_id(child["xmi:id"])
-                        if child.has_attr("name"):
-                            our_obj_time_connection.Set_name(child["name"])
-                        else:
-                            our_obj_time_connection.Set_name("None")
-                        if child.has_attr("sendevent"):
-                            our_obj_time_connection.Set_id_point_from(child["sendevent"])
-                        else:
-                            our_obj_time_connection.Set_id_point_from("None")
-                        if child.has_attr("receiveevent"):
-                            our_obj_time_connection.Set_id_point_to(child["receiveevent"])
-                        else:
-                            our_obj_time_connection.Set_id_point_to("None")
-                        our_obj_time_connection.Set_kind_connection(child["messagekind"])
-                        our_obj_time_connection.Set_type_connection(child["messagesort"])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+current_name+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+current_name+"' добавляется в модель"]])
-                        self.Add_object(our_obj_time_connection)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+current_name+"' добавлен в модель"]])
-                        del our_obj_time_connection
-                    if child["xmi:type"]=="uml:Property" and child.has_attr("name")==False and child.has_attr("visibility")==False:
-                        our_life_line=None
-                        for i in range(0,len(self.list_of_objects)):
-                            if self.list_of_objects[i].Get_type()=="uml:Lifeline" and self.list_of_objects[i].Get_connected_object_id()==child["xmi:id"]:
-                                our_life_line=self.list_of_objects[i]
-                                break
-                        if our_life_line==None:
-                            our_list_of_diagrams=self.model.Get_list_of_diagrams()
-                            for k in range(0,len(our_list_of_diagrams)):
-                                list_of_objects=our_list_of_diagrams[k].Get_list_of_objects()
-                                for i in range(0,len(list_of_objects)):
-                                    if list_of_objects[i].Get_type()=="uml:Lifeline" and list_of_objects[i].Get_connected_object_id()==child["xmi:id"]:
-                                        our_life_line=list_of_objects[i]
-                                        break
-                        if len(child.contents)!=0:
-                            our_life_line.Set_connected_object_id(child.contents[1]["xmi:idref"])
-                    if child["xmi:type"]=="uml:CombinedFragment":
-                        our_alternative=obj_Alternative()
-                       #result_page_job_tracert.configure(state="normal")
-                        our_alternative.Set_id(child["xmi:id"])
-                        our_alternative.Set_type(child["xmi:type"])
-                        our_alternative.Set_name(child["name"])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' начал читаться из XML файла"]])
-                        our_alternative.Set_type_alternative(child["interactionoperator"])
-                        our_alternative.Parse_alternative(child)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавляется в модель"]])
-                        self.Add_object(our_alternative)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+child["name"]+"' добавлен в модель"]])
-                        del our_alternative
-                    if child["xmi:type"]=="uml:InstanceSpecification":
-                        for i in range(0,len(self.list_of_objects)):
-                            if self.list_of_objects[i].Get_type()=="uml:Lifeline":
-                                if child["xmi:id"]==self.list_of_objects[i].Get_connected_object_id():
-                                    self.list_of_objects[i].Set_connected_object_id(child["classifier"])
-                                    break
-                        our_list_of_diagrams=self.model.Get_list_of_diagrams()
-                        for k in range(0,len(our_list_of_diagrams)):
-                            list_of_objects=our_list_of_diagrams[k].Get_list_of_objects()
-                            for i in range(0,len(list_of_objects)):
-                                if list_of_objects[i].Get_type()=="uml:Lifeline":
-                                    if child["xmi:id"]==list_of_objects[i].Get_connected_object_id():
-                                        list_of_objects[i].Set_connected_object_id(child["classifier"])
-                                        break
-                    if child["xmi:type"]=="uml:Comment":
-                        our_comment=Object()
-                        curr_text=''
-                        if child.has_attr("body"):
-                            curr_text+=child["body"]
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+curr_text+"' начал читаться из XML файла"]])
-                        our_comment.Set_id(child["xmi:id"])
-                        our_comment.Set_type(child["xmi:type"])
-                        our_comment.Set_name(curr_text)
-                        if len(child.contents)!=0:
-                            our_comment.Add_parents(child.contents[1]["xmi:idref"])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+curr_text+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+curr_text+"' добавляется в модель"]])
-                        self.Add_object(our_comment)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"'"+curr_text+"' добавлен в модель"]])
-                        del our_comment
-                    if child["xmi:type"]=="uml:Dependency" or child["xmi:type"]=="uml:Realization":
-                        our_dependency=obj_Connection()
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"' начал читаться из XML файла"]])
-                        our_dependency.Set_type(child["xmi:type"])
-                        our_dependency.Set_id(child["xmi:id"])
-                        if child.has_attr("name"):
-                            our_dependency.Set_name(child["name"])
-                        else:
-                            our_dependency.Set_name("None")
-                        our_dependency.Set_sender_class_id(child["client"])
-                        our_dependency.Set_recipient_class_id(child["supplier"])
-                        our_dependency.Set_role_sender("None")
-                        our_dependency.Set_role_recipient("None")
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"' прочитан"]])
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"' добавляется в модель"]])
-                        self.Add_object(our_dependency)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга",child["xmi:type"]+"' добавлен в модель"]])
-                        del our_dependency
-        self.Define_the_diagram_type()
+        if local_root.has_attr("xmi:id") and self.model.model_root.find("umldi:Diagram",attrs={"modelElement":local_root["xmi:id"]}):
+            self.id=local_root["xmi:id"]
+            self.type=self.model.model_root.find("umldi:Diagram",attrs={"modelElement":local_root["xmi:id"]})
+            if self.type.has_attr("xmi:id") and self.model.extention_root.find("diagram",attrs={"xmi:id":self.type["xmi:id"]}):
+                self.type=self.model.extention_root.find("diagram",attrs={"xmi:id":self.type["xmi:id"]})
+                if self.type.find("properties") and self.type.properties.has_attr("name") and self.type.properties.has_attr("type"):
+                    self.name=self.type.properties["name"]
+                    self.type=self.type.properties["type"]
+        self.model.controller.AddCommand(["Visual",["Информация о процессе 1","Идёт чтение диаграммы <"+self.name+">","Обычный"]])
+        self.Parse_node(local_root)
         return
-    def Completion_of_the_diagram_formation(self):  
-        if self.Get_type()=="Use Case diagram":
-            list_of_objects=self.list_of_objects
-            for i in range(0,len(list_of_objects)):
-                current_node=list_of_objects[i]
-                if current_node.Get_type()=="uml:UseCase":
-                    if len(current_node.Get_list_of_extentions())!=0:
-                        our_list_of_extentions=current_node.Get_list_of_extentions()
-                        for j in range(0,len(our_list_of_extentions)):
-                            if len(our_list_of_extentions[j])==2 and our_list_of_extentions[j][0][0:4]=="EAID" and our_list_of_extentions[j][1][0:4]=="EAID": 
-                                our_extention=[]
-                                our_extention.append(current_node.Get_id())
-                                for k in range(0,len(self.list_of_objects)):
-                                    if self.list_of_objects[k].Get_type()=="uml:Comment":
-                                        parents_list=self.list_of_objects[k].Get_parents_id()
-                                        for l in range(0,len(parents_list)):
-                                            if parents_list[l]==our_list_of_extentions[j][0]:
-                                                result=re.findall("([^ \|]{1}[^\|]*[^ \|]{1})",self.list_of_objects[k].Get_name())
-                                                our_extention.append(result)
-                                                break
-                                self.Find_object(our_list_of_extentions[j][1]).Add_extention(our_extention)
-                                current_node.Delete_extention(j)
-                                self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-                if current_node.Get_type()=="uml:Class":
-                    current_node.Set_type("System boundary")
-                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-        if self.Get_type()=="Sequence diagram":
-            list_of_objects=self.list_of_objects
-            for i in range(0,len(list_of_objects)):
-                current_node=list_of_objects[i]
-                if list_of_objects[i].Get_type()=="uml:Message":
-                    if list_of_objects[i].Get_id_point_from()!="None":
-                        our_point=self.Find_object(list_of_objects[i].Get_id_point_from())
-                        list_of_objects[i].Set_id_point_from(our_point.Get_name())
-                    if list_of_objects[i].Get_id_point_to()!="None":
-                        our_point=self.Find_object(list_of_objects[i].Get_id_point_to())
-                        list_of_objects[i].Set_id_point_to(our_point.Get_name())
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+self.list_of_objects[i].Get_name()+"'"]])
-            i=0
-            while i<len(list_of_objects):
-                if list_of_objects[i].Get_type()=="uml:OccurrenceSpecification":
-                    self.Delete_object(i,None)
-                else:
-                    i+=1
-        if self.Get_type()=="Class diagram":
-            list_of_objects=self.list_of_objects
-            for i in range(0,len(list_of_objects)):
-                current_node=list_of_objects[i]
-                if current_node.Get_type()=="uml:Class":
-                    for j in range(0,len(current_node.Get_list_of_parametres())):
-                        current_param=current_node.Get_info_about_param(j)
-                        current_association=None
-                        current_string=current_param[0]
-                        if current_string[0:4]=="EAID":
-                            current_association=self.model.Find_object_in_Model(current_param[0])
-                            if current_association.Get_recipient_class_id()==current_param[1]:
-                                current_association.Set_recipient_class_id(current_param[2])
-                                current_association.Set_flag_composite(True)
-                                self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-                        else:
-                            current_string=current_param[1]
-                            if current_string[0:4]=="EAID":
-                                current_node.Change_param(j,1,self.model.Find_object_in_Model(current_param[1]).Get_name())  
-                                self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-                    for j in range(0,len(current_node.Get_list_of_functions())):
-                        current_func=current_node.Get_info_about_func(j)
-                        for k in range(0,len(current_func)):
-                            current_string=current_func[k]
-                            if current_string[0:4]=="EAID":
-                                current_node.Change_func(j,k,self.model.Find_object_in_Model(current_string).Get_name())
-                                self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-        list_of_objects=self.list_of_objects
-        for i in range(0,len(list_of_objects)):
-            current_node=list_of_objects[i]
-            if current_node.Get_type()=="uml:Association":
-                if current_node.Get_flag_composite()==True:
-                    current_node.Set_type("uml:Composition")
-                    sender=self.model.Find_object_in_Model(current_node.Get_sender_class_id())
-                    recipient=self.model.Find_object_in_Model(current_node.Get_recipient_class_id())
-                    our_param=[]
-                    for j in range(0,len(sender.Get_list_of_parametres())):
-                        if j<len(sender.Get_list_of_parametres()) and sender.Get_info_about_param(j)[2]==recipient.Get_id():
-                            our_param.append(sender.Get_info_about_param(j)[3])
-                            sender.Delete_param(j)
-                            j-=1
-                            our_name=sender.Get_name()
-                            for k in range(0,len(recipient.Get_list_of_parametres())):
-                                local_name=recipient.Get_info_about_param(k)[1]
-                                if our_name==local_name[0:len(our_name)]:
-                                    our_name=local_name
-                            our_name+="_1"
-                            our_param.append(sender.Get_name())
-                            our_param.append(our_name)
-                            our_param.append(current_node.Take_type_string_from_type_number(current_node.Get_type_of_the_number_of_sender_class()))
-                            our_param.append("None")
-                            recipient.Add_param(our_param)
-                            self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-                    if current_node.Get_flag_shared()==False:
-                        sender.Set_independent_existence(False)
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
+    def Parse_node(self,root):
+        local_root=root
+        for child in local_root.children:
+            if child.name=="packagedElement" or child.name=="nestedClassifier" or child.name=="lifeline" or child.name=="message" or child.name=="ownedAttribute" or child.name=="ownedComment" or child.name=="ownedBehavior" or child.name=="fragment":
+                if child["xmi:type"]=="uml:Package" or child["xmi:type"]=="uml:Collaboration" or (child["xmi:type"]=="uml:Interaction" and child.name=="ownedBehavior"):
+                    self.Parse_node(child)
+                if child["xmi:type"]=="uml:Class" or child["xmi:type"]=="uml:Component" or child["xmi:type"]=="uml:Interface" or child["xmi:type"]=="uml:AssociationClass":
+                    new_obj_class=obj_Class(self)
+                    new_obj_class.Parse_class(child)
+                    del new_obj_class
+                if child["xmi:type"]=="uml:Association" or child["xmi:type"]=="uml:Dependency" or child["xmi:type"]=="uml:Realization":
+                    new_obj_connection=obj_Connection(self)
+                    new_obj_connection.Parse_connection(child)
+                    del new_obj_connection
+                if child["xmi:type"]=="uml:UseCase":
+                    new_use_case=obj_Use_Case(self)
+                    new_use_case.Parse_use_case(child)
+                    del new_use_case
+                if child["xmi:type"]=="uml:Actor":
+                    new_actor=Object()
+                    if child.has_attr("name"):
+                        new_actor.Set_name(child["name"])
+                        local_name=child["name"]
                     else:
-                        current_node.Set_type("uml:Aggregation")
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-                    for j in range(0,len(sender.Get_list_of_parametres())):
-                        if sender.Get_parent(j)==recipient.Get_id():
-                            sender.Delete_parent(j)
-                            self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
-                            break
-                elif self.model.Find_object_in_Model(current_node.Get_sender_class_id()).Get_type()=="uml:Actor":
-                    flag=False
-                    our_actors=self.model.Find_object_in_Model(current_node.Get_recipient_class_id()).Get_list_of_actors()
-                    for j in range(0,len(our_actors)):
-                        if our_actors[j]==current_node.Get_sender_class_id():
-                            flag=True
-                            break
-                    if flag==False:
-                        self.model.Find_object_in_Model(current_node.Get_recipient_class_id()).Add_actor(current_node.Get_sender_class_id())
-                        self.model.controller.AddCommand(["Visual",["Трассировка парсинга","Были внесены изменения в диаграмму '"+self.name+"', связанные с элементом '"+current_node.Get_name()+"'"]])
+                        new_actor.Set_name("None")
+                    if child.has_attr("xmi:id"):
+                        new_actor.Set_id(child["xmi:id"])
+                    else:
+                        new_actor.Set_id("None")
+                    if child.has_attr("xmi:type"):
+                        new_actor.Set_type(child["xmi:type"])
+                        local_type=child["xmi:type"]
+                    else:
+                        new_actor.Set_type("None")
+                    if len(child.contents)!=0:
+                       for i in range(0,len(child.contents)):
+                        if child.contents[i].name=="generalization" and child.contents[i].has_attr("general"):
+                            new_actor.Add_parents(child.contents[i]["general"])
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",new_actor.type+"'"+new_actor.name+"' начал читаться из XML файла"]])
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",new_actor.type+"'"+new_actor.name+"' прочитан"]])
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",new_actor.type+"'"+new_actor.name+"' добавляется в модель"]])
+                    self.Add_object(new_actor)
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",new_actor.type+"'"+new_actor.name+"' добавлен в модель"]])
+                    del new_actor
+                if child["xmi:type"]=="uml:Lifeline":
+                    new_obj_lifeLine=obj_LifeLine(self)
+                    new_obj_lifeLine.Parse_LifeLine(child)
+                    del new_obj_lifeLine
+                if child["xmi:type"]=="uml:Message":
+                    our_obj_time_connection=obj_Message(self)
+                    our_obj_time_connection.Parse_Message(child)
+                    del our_obj_time_connection
+                if child["xmi:type"]=="uml:CombinedFragment":
+                    our_alternative=obj_Alternative(self)
+                    our_alternative.Parse_alternative(child)
+                    del our_alternative
+                if child["xmi:type"]=="uml:Comment":
+                    our_comment=Object()
+                    if child.has_attr("xmi:type"):
+                        our_comment.Set_type(child["xmi:type"])
+                    if child.has_attr("body"):
+                        our_comment.Set_name("body")
+                    if child.has_attr("xmi:id"):
+                        our_comment.Set_id(child["xmi:id"])
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",our_comment.type+"'"+our_comment.name+"' начал читаться из XML файла"]])
+                    if len(child.contents)!=0 and child.contents[1].has_attr("xmi:idref"):
+                        our_comment.Add_parents(child.contents[1]["xmi:idref"])
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",our_comment.type+"'"+our_comment.name+"' прочитан"]])
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",our_comment.type+"'"+our_comment.name+"' добавляется в модель"]])
+                    self.Add_object(our_comment)
+                    self.model.controller.AddCommand(["Visual",["Трассировка парсинга",our_comment.type+"'"+our_comment.name+"' добавлен в модель"]])
+                    del our_comment
+        return
+    def Completion_of_the_diagram_formation(self): 
+        if self.type=="Logical":#диаграмма классов
+            for object in self.list_of_objects:
+                if isinstance(object,obj_Connection):   
+                    if object.Get_flag_composite() or object.Get_flag_shared():
+                        source=self.Find_object(object.Get_sender_class_id())
+                        target=self.Find_object(object.Get_recipient_class_id())
+                        if source!="None" and target!="None":
+                            additional_param=["Protected","None","None","None","None"]
+                            additional_param[1]=source.name
+                            new_name=source.name+"_1"
+                            target_params=target.Get_list_of_parametres()
+                            while list(filter(lambda x: str(new_name) in x, target_params)):
+                                new_name+="_1"
+                            additional_param[2]=new_name
+                            target.Add_param(additional_param)
+                        if object.Get_flag_composite()==True:
+                            source.Set_independent_existence(False)
         return
     def UsualCheck(self):
         global predictor
+        if predictor==None:
+            predictor=RNNMorphPredictor(language="en")
         if len(self.list_of_objects)==0:
-            self.model.Add_recomendation("Диаграмма '"+self.name+"' пустая, рекомендуется внести в неё элементы","Детальность модели")
+            self.model.Add_recomendation("Диаграмма '"+self.name+"' пустая, рекомендуется внести в неё элементы","Детальность модели","None",[])
         local_numbers=0
         for i in range(0,len(self.model.Get_list_of_diagrams())):
             if self.model.Get_list_of_diagrams()[i].Get_name()==self.name:
                 local_numbers+=i*1000
-        if self.type=="Use Case diagram":
+        if self.type=="Use Case":
             for i in range(0,len(self.list_of_objects)):
                 if self.list_of_objects[i].Get_type()=="uml:UseCase":
                     flag_extention=False
@@ -1560,7 +1520,7 @@ class obj_Diagram(Object):
                                 number_of_an_existing_diagram=j
                                 break
                         if flag_exist==False:
-                            self.model.Add_recomendation("Рекомендуется создать диаграмму системных взаимодействий, связанную с прецедентов '"+self.list_of_objects[i].Get_name()+"'","Полнота модели")
+                            self.model.Add_recomendation("Рекомендуется создать диаграмму системных взаимодействий, связанную с прецедентов '"+self.list_of_objects[i].Get_name()+"'","Полнота модели","None",[])
                         else:
                             list_of_actors=self.list_of_objects[i].Get_list_of_actors()
                             sequence_diagram_objects=self.model.Get_diagram(number_of_an_existing_diagram).Get_list_of_objects()
@@ -1571,7 +1531,7 @@ class obj_Diagram(Object):
                                         flag_extention=True
                                         break
                                 if flag_extention==False:
-                                    self.model.Add_recomendation("Рекомендуется добавить актёра с именем '"+self.model.Find_object_in_Model(list_of_actors[j]).Get_name()+"' в диаграмму системных взаимодейтсвий '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'","Детальность модели")
+                                    self.model.Add_recomendation("Рекомендуется добавить актёра с именем '"+self.model.Find_object_in_Model(list_of_actors[j]).Get_name()+"' в диаграмму системных взаимодейтсвий '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'","Детальность модели","None",[])
                             list_of_extentions=self.list_of_objects[i].Get_list_of_extentions()
                             for j in range(0,len(list_of_extentions)):
                                 flag_extention=False
@@ -1580,7 +1540,7 @@ class obj_Diagram(Object):
                                         flag_extention=True
                                         break
                                 if flag_extention==False:
-                                    self.model.Add_recomendation("Рекомендуется добавить комбинированный фрагмент (alt) с именем '"+self.model.Find_object_in_Model(list_of_extentions[j][0]).Get_name()+"' в диаграмму системных взаимодействий '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'","Полнота модели")
+                                    self.model.Add_recomendation("Рекомендуется добавить комбинированный фрагмент (alt) с именем '"+self.model.Find_object_in_Model(list_of_extentions[j][0]).Get_name()+"' в диаграмму системных взаимодействий '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'","Полнота модели","None",[])
                                 else:
                                     flag_extention=False
                                     list_of_alternatives=sequence_diagram_objects[k].Get_list_of_alternatives()
@@ -1592,11 +1552,11 @@ class obj_Diagram(Object):
                                                     flag_exist=True
                                                     break
                                             if flag_exist==False:
-                                                self.model.Add_recomendation("Рекомендуется добавить условие '"+condition+"' в комбинированный фрагмент '"+self.model.Find_object_in_Model(list_of_extentions[j][0]).Get_name()+"' в диаграмме системных взаимодействий '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'","Детальность модели")
-        if self.type=="Sequence diagram":
+                                                self.model.Add_recomendation("Рекомендуется добавить условие '"+condition+"' в комбинированный фрагмент '"+self.model.Find_object_in_Model(list_of_extentions[j][0]).Get_name()+"' в диаграмме системных взаимодействий '"+self.model.Get_diagram(number_of_an_existing_diagram).Get_name()+"'","Детальность модели","None",[])
+        if self.type=="Sequence":
             list_of_use_cases_diagrams=[]
             for i in range(0,len(self.model.Get_list_of_diagrams())):
-                if self.model.Get_diagram(i).Get_type()=="Use Case diagram":
+                if self.model.Get_diagram(i).Get_type()=="Use Case":
                     list_of_use_cases_diagrams.append(self.model.Get_diagram(i))
             flag_exist=False
             for i in range(0,len(list_of_use_cases_diagrams)):
@@ -1608,14 +1568,14 @@ class obj_Diagram(Object):
                 if flag_exist==True:
                     break
             if flag_exist==False:
-                self.model.Add_recomendation("Рекомендуется создать прецедент с именем '"+self.name+"', который будет связан с диаграммой системных взаимодействий с именем '"+self.name+"'","Полнота модели")
+                self.model.Add_recomendation("Рекомендуется создать прецедент с именем '"+self.name+"', который будет связан с диаграммой системных взаимодействий с именем '"+self.name+"'","Полнота модели","None",[])
             else:
                 counter=0
                 list_of_objects=self.Get_list_of_objects()
                 for i in range(0,len(list_of_objects)):
                     if list_of_objects[i].Get_type()=="uml:Lifeline":
                         counter+=1
-                        if list_of_objects[i].Get_connected_object_id()[0:7]!="EAID_AT":
+                        if list_of_objects[i].Get_connected_object_id()!="None":
                             connected_object=self.model.Find_object_in_Model(list_of_objects[i].Get_connected_object_id())
                             if connected_object.Get_type()!="uml:Actor":
                                 list_of_functions=connected_object.Get_list_of_functions()
@@ -1630,21 +1590,22 @@ class obj_Diagram(Object):
                                             flag_exist=True
                                             break
                                     if flag_exist==False:
-                                        self.model.Add_recomendation("Объект '"+connected_object.Get_name()+"' не имеет функцию с именем '"+list_of_messages[j].Get_name()+"'. Рекомендуется изменить имя системного вызова в диаграмме системных взаимодейтсвий с именем '"+self.name+"' на уже существующую в данном объекте или создать новую функцию с таким именем","Детальность модели")
+                                        self.model.Add_recomendation("Объект '"+connected_object.Get_name()+"' не имеет функцию с именем '"+list_of_messages[j].Get_name()+"'. Рекомендуется изменить имя системного вызова в диаграмме системных взаимодейтсвий с именем '"+self.name+"' на уже существующую в данном объекте или создать новую функцию с таким именем","Детальность модели","None",[])
                         else:
-                            self.model.Add_recomendation("Рекомендуется соединить временную линию '"+list_of_objects[i].Get_name()+"' в диаграмме системных взаимодействий с именем '"+self.name+"' с существующим классом","Детальность модели")
+                            self.model.Add_recomendation("Рекомендуется соединить временную линию '"+list_of_objects[i].Get_name()+"' в диаграмме системных взаимодействий с именем '"+self.name+"' с существующим классом","Детальность модели","None",[])
                     if list_of_objects[i].Get_type()=="uml:CombinedFragment":
                         list_of_covered_lifelines=list_of_objects[i].Get_list_of_covered_lifeline().copy()
                         j=0
+                        #print(list_of_covered_lifelines)
                         while j<len(list_of_covered_lifelines):
-                            if self.model.Find_object_in_Model(list_of_covered_lifelines[j]).Get_connected_object_id()[0:7]=="EAID_AT" or self.model.Find_object_in_Model(self.model.Find_object_in_Model(list_of_covered_lifelines[j]).Get_connected_object_id()).Get_type()=="uml:Actor":
+                            if self.model.Find_object_in_Model(list_of_covered_lifelines[j]).Get_connected_object_id()=="None" or (self.model.Find_object_in_Model(self.model.Find_object_in_Model(list_of_covered_lifelines[j]).Get_connected_object_id())!=None and self.model.Find_object_in_Model(self.model.Find_object_in_Model(list_of_covered_lifelines[j]).Get_connected_object_id()).Get_type()=="uml:Actor"):
                                 list_of_covered_lifelines.pop(j)
                             else:
                                 j+=1
                         if len(list_of_covered_lifelines)==0 and list_of_objects[i].Get_type_alternative()=="alt":
                             list_of_use_cases_diagrams=[]
                             for j in range(0,len(self.model.Get_list_of_diagrams())):
-                                if self.model.Get_diagram(j).Get_type()=="Use Case diagram":
+                                if self.model.Get_diagram(j).Get_type()=="Use Case":
                                     list_of_use_cases_diagrams.append(self.model.Get_diagram(j))
                             current_use_case_diagram=None
                             current_use_case=None
@@ -1666,28 +1627,30 @@ class obj_Diagram(Object):
                                     list_of_extentions=extention
                                     flag_exist=True
                                     break
-                            print(list_of_extentions)
+                            #print(list_of_extentions)
                             if flag_exist==False:
-                                self.model.Add_recomendation("Рекомендуется добавить расширение с именем '"+list_of_objects[i].Get_name()+"' в прецедент с именем '"+current_use_case.Get_name()+"' в диаграмме прецедентов '"+current_use_case_diagram.Get_name()+"'","Детальность модели")
+                                self.model.Add_recomendation("Рекомендуется добавить расширение с именем '"+list_of_objects[i].Get_name()+"' в прецедент с именем '"+current_use_case.Get_name()+"' в диаграмме прецедентов '"+current_use_case_diagram.Get_name()+"'","Детальность модели","None",[])
                             else:
-                                print("LIST:")
-                                print(list_of_objects[i].Get_list_of_alternatives())
+                                #print("LIST:")
+                                #print(list_of_objects[i].Get_list_of_alternatives())
                                 for condition in list_of_objects[i].Get_list_of_alternatives():
-                                    print("CON",condition)
+                                    #print("CON",condition)
                                     flag_exist=False
+                                    #print("List_of_ext:")
+                                    #print(list_of_extentions[1])
                                     for node_condition in list_of_extentions[1]:
                                         if condition[0]==node_condition:
                                             flag_exist=True
                                             break
                                     if flag_exist==False:
-                                        self.model.Add_recomendation("Рекомендуется добавить условие '"+condition[0]+"' из '"+list_of_objects[i].name+"' из '"+self.name+"' в расширение '"+self.model.Find_object_in_Model(list_of_extentions[0]).name+"' в '"+current_use_case_diagram.name+"'","Детальность модели")
+                                        self.model.Add_recomendation("Рекомендуется добавить условие '"+condition[0]+"' из '"+list_of_objects[i].name+"' из '"+self.name+"' в расширение '"+self.model.Find_object_in_Model(list_of_extentions[0]).name+"' в '"+current_use_case_diagram.name+"'","Детальность модели","None",[])
                 if counter<2:
-                    self.model.Add_recomendation("В диаграмме системных взаимодействий '"+self.name+"' есть только одна временная линия. Данная диаграмма является некорректной и рекомендуется добавление в неё еще нескольких временных линий.","Детальность модели")
-        if self.type=="Class diagram":
+                    self.model.Add_recomendation("В диаграмме системных взаимодействий '"+self.name+"' есть только одна временная линия. Данная диаграмма является некорректной и рекомендуется добавление в неё еще нескольких временных линий.","Детальность модели","None",[])
+        if self.type=="Logical":
             for i in range(0,len(self.list_of_objects)):
                 if self.list_of_objects[i].Get_type()=="uml:Class":
                     if len(self.list_of_objects[i].Get_list_of_functions())==0:
-                        self.model.Add_recomendation("Рекомендуется в класс '"+self.list_of_objects[i].Get_name()+"' добавить функции, т.к. класс не обладает ни одной функцией","Детальность модели")
+                        self.model.Add_recomendation("Рекомендуется в класс '"+self.list_of_objects[i].Get_name()+"' добавить функции, т.к. класс не обладает ни одной функцией","Детальность модели","None",[])
                     list_of_children=[]
                     for j in range(0,len(self.list_of_objects)):
                         if self.list_of_objects[j].Get_type()=="uml:Class":
@@ -1716,63 +1679,25 @@ class obj_Diagram(Object):
                             current_string="Рекомендуется вынести функцию '"+list_of_functions[j][0]+"' из классов"
                             for k in range(0,len(list_of_children)):
                                 current_string+=" '"+list_of_children[k].Get_name()+"'"
-                            current_string+=" в их родителя и сделать её виртуальной"
-                            self.model.Add_recomendation(current_string,"Детальность модели")
-        list_of_connected_objects=[]
-        for i in range(0,len(self.list_of_objects)):
-            if self.list_of_objects[i].Get_type()!="uml:Association" and self.list_of_objects[i].Get_type()!="uml:Message" and self.list_of_objects[i].Get_type()!="uml:Aggregation" and self.list_of_objects[i].Get_type()!="uml:Composition":
-                flag_exist=False
-                for j in range(0,len(list_of_connected_objects)):
-                    if self.list_of_objects[i].Get_name()==list_of_connected_objects[j][0] and self.list_of_objects[i].Get_type()==list_of_connected_objects[j][2]:
-                        flag_exist=True
-                        list_of_connected_objects[j][1]+=1
-                        break
-                if flag_exist==False:
-                    new_conn_obj=[]
-                    new_conn_obj.append(self.list_of_objects[i].Get_name())
-                    number_of_connected_objects=len(self.list_of_objects[i].Get_parents_id())
-                    for j in range(0,len(self.list_of_objects)):
-                        for k in range(0,len(self.list_of_objects[j].Get_parents_id())):
-                            if self.list_of_objects[j].Get_parent(k)==self.list_of_objects[i].Get_id():
-                                number_of_connected_objects+=1
-                    if self.list_of_objects[i].Get_type()=="uml:CombinedFragment":
-                        number_of_connected_objects+=len(self.list_of_objects[i].Get_list_of_covered_lifeline())
-                    new_conn_obj.append(number_of_connected_objects)
-                    new_conn_obj.append(self.list_of_objects[i].Get_type())
-                    list_of_connected_objects.append(new_conn_obj)
-        for i in range(0,len(self.list_of_objects)):
-            if self.list_of_objects[i].Get_type()=="uml:Association" or self.list_of_objects[i].Get_type()=="uml:Aggregation" or self.list_of_objects[i].Get_type()=="uml:Composition":
-                sender_id=self.list_of_objects[i].Get_sender_class_id()
-                recipient_id=self.list_of_objects[i].Get_recipient_class_id()
-                sender=self.Find_object(sender_id)
-                recipient=self.Find_object(recipient_id)
-                for j in range(0,len(list_of_connected_objects)):
-                    if list_of_connected_objects[j][0]==sender.Get_name() or list_of_connected_objects[j][0]==recipient.Get_name():
-                        list_of_connected_objects[j][1]+=1
-            elif self.list_of_objects[i].Get_type()=="uml:Message":
-                sender_id=self.list_of_objects[i].Get_id_point_from()
-                recipient_id=self.list_of_objects[i].Get_id_point_to()
-                sender=self.Find_object(sender_id)
-                recipient=self.Find_object(recipient_id)
-                for j in range(0,len(list_of_connected_objects)):
-                    if list_of_connected_objects[j][0]==sender.Get_name() or list_of_connected_objects[j][0]==recipient.Get_name():
-                        list_of_connected_objects[j][1]+=1        
-        for i in range(0,len(list_of_connected_objects)):
-            if list_of_connected_objects[i][1]==0:
-                self.model.Add_recomendation("Объект '"+list_of_connected_objects[i][0]+"' из диаграммы '"+self.name+"' ни с чем не связан, необходимо данный объект связать с другими элементами диаграммы","Детальность модели")
+                            current_string+=" в их родителя '"+self.list_of_objects[i].name+"' и сделать её виртуальной"
+                            list_of_ids=[self.id]
+                            for child in list_of_children:
+                                list_of_ids.append(child.id)
+                            list_of_ids.append(self.list_of_objects[i].id)
+                            self.model.Add_recomendation(current_string,"Детальность модели","Вынос функции в родителя",list_of_ids)
         return
     def __del__(self):
         while len(self.list_of_objects)>0:
             del self.list_of_objects[0]
     #Раздел с паттернами и механизмами
     def Offering_classes_on_frequently_repeated_nouns_in_use_cases(self):
-        if self.type=="Use Case diagram":
+        if self.type=="Use Case":
             for object in self.list_of_objects:
                 if object.type=="uml:UseCase":
                     self.Get_nouns_and_verbs_from_words(object)
             list_of_class_diagams=[]
             for i in range(0,len(self.model.Get_list_of_diagrams())):
-                if self.model.Get_diagram(i).Get_type()=="Class diagram":
+                if self.model.Get_diagram(i).Get_type()=="Logical":
                     list_of_class_diagams.append(self.model.Get_diagram(i))
             for i in range(0,len(self.list_of_nouns)):                
                 if self.list_of_nouns[i][1]>=2:
@@ -1784,22 +1709,22 @@ class obj_Diagram(Object):
                                 flag_exist=True
                                 break
                     if flag_exist==False:
-                        self.model.Add_recomendation("Рекомендуется создать класс с именем '"+self.list_of_nouns[i][0]+"'","Механизм предложения классов по часто повторяющимся существительным в прецедентах")
+                        self.model.Add_recomendation("Рекомендуется создать класс с именем '"+self.list_of_nouns[i][0]+"'","Механизм предложения классов по часто повторяющимся существительным в прецедентах","None",[])
         return
     def Paired_words_in_sequence_diagrams(self):
-        if self.type=="Sequence diagram" or self.type=="Use Case diagram":
+        if self.type=="Sequence" or self.type=="Use Case":
             for object in self.list_of_objects:
                 if object.type=="uml:Message" or object.type=="uml:UseCase":
                     self.Get_nouns_and_verbs_from_words(object)
             list_of_class_diagams=[]
             for i in range(0,len(self.model.Get_list_of_diagrams())):
-                if self.model.Get_diagram(i).Get_type()=="Class diagram":
+                if self.model.Get_diagram(i).Get_type()=="Logical":
                     list_of_class_diagams.append(self.model.Get_diagram(i))
             #print("Список глаголов:",self.list_of_verbs)
             for i in range(0,len(self.list_of_verbs)):
                 current_verb=self.list_of_verbs[i]
                 current_sequence_diagram=None
-                if self.Get_type()=="Sequence diagram":
+                if self.Get_type()=="Sequence":
                     current_sequence_diagram=self
                 else:
                     for j in range(0,len(self.model.Get_list_of_diagrams())):
@@ -1840,13 +1765,13 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'turn on' и 'switch off', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'turn on' и 'switch off', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'turn on', так как существует системный вызов 'switch off'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'turn on', так как существует системный вызов 'switch off'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'switch off', так как существует системный вызов 'turn on'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'switch off', так как существует системный вызов 'turn on'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'turn on' поставить выше системного вызова 'switch off'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'turn on' поставить выше системного вызова 'switch off'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="open" or current_verb[0]=="close":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["open",False])
@@ -1879,13 +1804,13 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'open' и 'close', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'open' и 'close', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'open', так как существует системный вызов 'close'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'open', так как существует системный вызов 'close'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'close', так как существует системный вызов 'open'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'close', так как существует системный вызов 'open'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'open' поставить выше системного вызова 'close'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'open' поставить выше системного вызова 'close'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="log in" or current_verb[0]=="log out":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["log in",False])
@@ -1918,13 +1843,13 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'log in' и 'log out', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'log in' и 'log out', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'log in', так как существует системный вызов 'log out'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'log in', так как существует системный вызов 'log out'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'log out', так как существует системный вызов 'log in' и это может повысить безопасность ситемных взаимодейтсвий в данном сценарии","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'log out', так как существует системный вызов 'log in' и это может повысить безопасность ситемных взаимодейтсвий в данном сценарии","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'log in' поставить выше системного вызова 'log out'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'log in' поставить выше системного вызова 'log out'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="send" or current_verb[0]=="recieve":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["send",False])
@@ -1957,13 +1882,13 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'send' и 'recieve', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'send' и 'recieve', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('send' или 'find') связанный с системным вызовом 'recieve'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('send' или 'find') связанный с системным вызовом 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'recieve', так как существует системный вызов 'send', но нет ответа на эту отправку","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'recieve', так как существует системный вызов 'send', но нет ответа на эту отправку","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'send' поставить выше системного вызова 'recieve'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'send' поставить выше системного вызова 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="find" or current_verb[0]=="recieve":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["find",False])
@@ -1996,13 +1921,13 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'find' и 'recieve', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'find' и 'recieve', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('send' или 'find') связанный с системным вызовом 'recieve'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('send' или 'find') связанный с системным вызовом 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'recieve', так как существует системный вызов 'find', ведь при поиске необходимо получить искомый объект","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'recieve', так как существует системный вызов 'find', ведь при поиске необходимо получить искомый объект","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'find' поставить выше системного вызова 'recieve'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'find' поставить выше системного вызова 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="edit":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["find",False])
@@ -2032,11 +1957,11 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'find' и 'edit', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'find' и 'edit', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'find', так как существует системный вызов 'edit'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'find', так как существует системный вызов 'edit'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'find' поставить выше системного вызова 'edit'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'find' поставить выше системного вызова 'edit'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="start" or current_verb[0]=="finish":                    
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["start",False])
@@ -2069,13 +1994,13 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'start' и 'finish', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'start' и 'finish', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'start', так как существует системный вызов 'finish'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'start', так как существует системный вызов 'finish'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'finish', так как существует системный вызов 'start'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'finish', так как существует системный вызов 'start'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'start' поставить выше системного вызова 'finish'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'start' поставить выше системного вызова 'finish'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                     elif current_verb[0]=="download" or current_verb[0]=="upload":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["select",False])
@@ -2120,15 +2045,15 @@ class obj_Diagram(Object):
                                     second_sequence=current_list_of_recommended_sequence[j][0]
                                     break 
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'select' и 'download или upload', так как их наличие подразумевает само название данной диаграммы","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'select' и 'download или upload', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'select', так как существует системный вызов '"+second_sequence+"'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'select', так как существует системный вызов '"+second_sequence+"'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'download или upload', так как существует системный вызов 'select'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'download или upload', так как существует системный вызов 'select'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'select' поставить выше системного вызова '"+second_sequence+"'","Механизм преложения парных глаголов в диаграммах прецеднтов")
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'select' поставить выше системного вызова '"+second_sequence+"'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
     def GRASP(self):
-        if self.type=="Class diagram":
+        if self.type=="Logical":
             for object in self.list_of_objects:
                 if object.type=="uml:Class":
                     list_of_params=object.Get_list_of_parametres().copy()
@@ -2141,7 +2066,7 @@ class obj_Diagram(Object):
                                 break
                         if flag_exist==False:
                             if list_of_params[j][2]!=object.Get_name():
-                                self.model.Add_recomendation("Рекомендуется создать отдельный класс для типа данных '"+list_of_params[j][2]+"', чтобы увеличить зацепление и обеспечить низкую связность между элементами классами в модели","GRASP")
+                                self.model.Add_recomendation("Рекомендуется создать отдельный класс для типа данных '"+list_of_params[j][2]+"', чтобы увеличить зацепление и обеспечить низкую связность между элементами классами в модели","GRASP","None",[])
                             list_of_params.pop(j)
                         else:
                             j+=1
@@ -2155,7 +2080,7 @@ class obj_Diagram(Object):
                                     flag_exist=True
                                     break
                             if flag_exist==False:
-                                self.model.Add_recomendation("Рекомендуется в класс '"+object.Get_name()+"' добавить функцию для создания '"+list_of_params[j][1]+"', так как он работает с ними","GRASP")
+                                self.model.Add_recomendation("Рекомендуется в класс '"+object.Get_name()+"' добавить функцию для создания '"+list_of_params[j][1]+"', так как он работает с ними","GRASP","None",[])
                             current_object=None
                             for k in range(0,len(self.list_of_objects)):
                                 if self.list_of_objects[k].Get_name()==list_of_params[j][1]:
@@ -2168,22 +2093,18 @@ class obj_Diagram(Object):
                                     flag_exist=True
                                     break
                             if flag_exist==True:
-                                self.model.Add_recomendation("Рекомендуется создать отдельный класс с классами '"+object.Get_name()+"' и '"+current_object.Get_name()+"', ослабляющий сильную связь между ними (в первом классе есть второй, а во втором - первый) ","GRASP")
+                                self.model.Add_recomendation("Рекомендуется создать отдельный класс с классами '"+object.Get_name()+"' и '"+current_object.Get_name()+"', ослабляющий сильную связь между ними (в первом классе есть второй, а во втором - первый) ","GRASP","None",[])
         return
 
 class obj_Class(Object):
-    list_of_parametres=[]#[видимость,тип,имя,кратность,начальное значение]
-    list_of_functions=[]
-    independent_existence=True
-    sender_class_id=""
-    recipient_class_id=""
-    def __init__(self):
-        self.parents_id=[]
-        self.list_of_parametres=[]
-        self.list_of_functions=[]
-        self.independent_existence=True
-        self.sender_class_id=""
-        self.recipient_class_id=""
+    def __init__(self,init_diagram):
+        self.diagram=init_diagram
+        self.list_of_parametres=[]#[[видимость,тип,имя,кратность,начальное значение],...,[видимость,тип,имя,кратность,начальное значение]]
+        self.list_of_functions=[]#[[видимость,тип возвращаемого значения,имя,тип парамерта, имя параметра,тип параемтра, имя параметра],...,[видимость,тип возвращаемого значения,имя,тип парамерта, имя параметра,тип параемтра, имя параметра]]
+        self.independent_existence=True#флаг независимого существования
+        self.sender_class_id="None"
+        self.recipient_class_id="None"
+        super().__init__()
         return
     def Add_param(self,new_param):
         self.list_of_parametres.append(new_param)
@@ -2240,75 +2161,84 @@ class obj_Class(Object):
         return self.recipient_class_id
     def Parse_class(self,root):
         local_root=root
-        if local_root.name=="nestedclassifier":
-            self.Add_parents(local_root.parent["xmi:id"])
-        for child in local_root.children:
-            if child.name=="ownedattribute":
-                new_attribute=[]
-                if child.has_attr("association"):
-                    new_attribute.append(child["association"])
-                    new_attribute.append(child["xmi:id"])
-                    new_attribute.append(child.contents[1]["xmi:idref"])
-                    new_attribute.append(child["visibility"])
-                else:
-                    new_attribute.append(child["visibility"])
-                    our_elem=child.find("type")
-                    if our_elem!=None:
-                        if our_elem.has_attr("href"):
-                            new_attribute.append(our_elem["href"])
-                        else:
-                            new_attribute.append(our_elem["xmi:idref"])
-                    else:
-                        new_attribute.append("None")
-                    if child.has_attr("name"):
-                        new_attribute.append(child["name"])
-                    else:
-                        new_attribute.append("None")
-                    new_attribute.append("None")
-                    for check in child.children:
-                        if check.name=="defaultvalue":
-                            new_attribute.append(check["value"])
-                while len(new_attribute)!=5:
-                    new_attribute.append("None")
-                self.Add_param(new_attribute)
-            if child.name=="ownedoperation":
-                new_operation=[]
-                new_operation.append(child["visibility"])
-                new_operation.append("")
-                new_operation.append(child["name"])
-                for i in child.children:
-                    if i.name=="ownedparameter" and i["direction"]!="return":
-                        our_elem=i.find("type")
-                        if our_elem!=None:
-                            new_operation.append(i.contents[1]["href"])
-                        elif i.has_attr("type")!=False:
-                            new_operation.append(i["type"])
-                        else:
-                            new_operation.append("None")
-                        new_operation.append(i["name"])
-                    if i.name=="ownedparameter" and i["direction"]=="return":
-                        new_operation[1]=i["type"]
-                self.Add_func(new_operation)
-            if child.name=="generalization":
-                flag=False
-                for i in range(0,len(self.parents_id)):
-                    if self.parents_id[i]==child["general"]:
-                        flag=True
-                        break
-                if flag==False:
-                    self.Add_parents(child["general"])
-            if self.Get_type()=="uml:AssociationClass":
-                if child.name=="memberend":
-                    if child["xmi:idref"][5:8]=="dst":
-                        self.recipient_class_id=child["xmi:idref"]
-                    else:
-                        self.sender_class_id=child["xmi:idref"]
-                elif child.name=="ownedend":
-                    if child["xmi:id"]==self.sender_class_id:
-                        self.sender_class_id=child.contents[1]["xmi:idref"]
-                    else:
-                        self.recipient_class_id=child.contents[1]["xmi:idref"]
-        self.Change_params_to_correct()
+        help_root=self.diagram.model.extention_root.find("element",attrs={"xmi:idref":local_root["xmi:id"]})
+        if help_root!=None:
+            if help_root.has_attr("xmi:idref"):
+                self.Set_id(help_root["xmi:idref"])
+            if help_root.has_attr("xmi:type"):
+                self.Set_type(help_root["xmi:type"])
+            if help_root.has_attr("name"):
+                self.Set_name(help_root["name"])
+            self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+" '"+self.name+"' начал читаться из XML файла"]])
+            attributes=help_root.find("attributes")
+            if attributes!=None:
+                attributes=attributes.find_all("attribute")
+                if attributes!=None:
+                    for attribute in attributes:
+                        new_atribute=["None","None","None","None","None"]
+                        if attribute.has_attr("scope"):
+                            new_atribute[0]=attribute["scope"]
+                        if attribute.has_attr("name"):
+                            new_atribute[2]=attribute["name"]
+                        if attribute.find("properties")!=None and attribute.properties.has_attr("type"):
+                            new_atribute[1]=attribute.properties["type"]
+                        if attribute.find("initial")!=None and attribute.initial.has_attr("body"):
+                            new_atribute[4]=attribute.initial["body"]
+                        self.list_of_parametres.append(new_atribute)
+            operations=help_root.find("operations")
+            if operations!=None:
+                operations=operations.find_all("operation")
+                if operations!=None:
+                    for operation in operations:
+                        new_operation=["None","None","None"]
+                        if operation.has_attr("scope"):
+                            new_operation[0]=operation["scope"]
+                        if operation.has_attr("name"):
+                            new_operation[2]=operation["name"]
+                        if operation.find("type")!=None and operation.type.has_attr("type"):
+                            new_operation[1]=operation.type["type"]
+                        parameters=operation.find("parameters")
+                        if parameters!=None:
+                            parameters=parameters.find_all("parameter")
+                            if parameters!=None:
+                                for parameter in parameters:
+                                    if parameter.has_attr("xmi:idref") and local_root.find("ownedParameter",attrs={"xmi:id":parameter["xmi:idref"]}):
+                                        properties=parameter.find("properties")
+                                        if properties!=None and properties.has_attr("type"):
+                                            new_operation.append(properties["type"])
+                                        else:
+                                            new_operation.append("None")
+                                        if local_root.find("ownedParameter",attrs={"xmi:id":parameter["xmi:idref"]}).has_attr("name"):
+                                            new_operation.append(local_root.find("ownedParameter",attrs={"xmi:id":parameter["xmi:idref"]})["name"])
+                                        else:
+                                            new_operation.append("None")
+                        self.list_of_functions.append(new_operation)
+            extendedProperties=help_root.find("extendedProperties")
+            if extendedProperties!=None and extendedProperties.has_attr("conID"):
+                connector=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":extendedProperties["conID"]})
+                if connector!=None:
+                    source=connector.find("source")
+                    if source!=None and source.has_attr("xmi:idref"):
+                        self.sender_class_id=source["xmi:idref"]
+                    target=connector.find("target")
+                    if target!=None and target.has_attr("xmi:idref"):
+                        self.recipient_class_id=target["xmi:idref"]
+            links=help_root.find("links")
+            if links!=None:
+                Generalizations=links.find_all("Generalization",attrs={"start":self.id})
+                if Generalizations!=None:
+                    for Generalization in Generalizations:
+                        if Generalization.has_attr("end"):
+                            self.parents_id.append(Generalization["end"])               
+        for child in local_root:
+            if child.name=="nestedClassifier" and child.has_attr("xmi:type") and child["xmi:type"]=="uml:Class":
+                new_class=obj_Class(self.diagram)
+                new_class.Parse_class(child)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+" '"+self.name+"' прочитан"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+" '"+self.name+"' добавляется в модель"]])
+        #print("Type:"+self.type+"|Id:"+self.id)
+        self.diagram.Add_object(self)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+" '"+self.name+"' добавлен в модель"]])
         return
     def Change_params_to_correct(self):
         for i in range(0,len(self.list_of_parametres)):
@@ -2334,44 +2264,25 @@ class obj_Class(Object):
         if number_of_param<0 or number_of_param>len(self.list_of_parametres):
             return None
         del self.list_of_parametres[number_of_param]
-    
+
 class obj_Connection(Object):
-    sender_class_id=""
-    recipient_class_id=""
-    #connection types of sender-recipient classes
-	#0=*
-	#1=0
-	#2=0..*
-	#3=0..1
-	#4=1
-	#5=1..*
-    type_of_the_number_of_sender_class=0
-    type_of_the_number_of_recipient_class=0
-    role_sender=""
-    role_recipient=""
-    flag_composite=False
-    flag_shared=False
-    def __init__(self):
-        self.sender_class_id=""
-        self.recipient_class_id=""
-        self.type_of_the_number_of_sender_class=-1
-        self.type_of_the_number_of_recipient_class=-1
-        self.role_sender=""
-        self.role_recipient=""
-        self.flag_composite=False
-        self.flag_shared=False
+    def __init__(self,init_diagram):
+        self.diagram=init_diagram
+        self.sender_class_id="None"
+        self.recipient_class_id="None"
+        self.multiplicity_of_sender_class="None"
+        self.multiplicity_of_recipient_class="None"
+        self.role_sender="None"
+        self.role_recipient="None"
+        self.flag_composite=False#флаг композиции
+        self.flag_shared=False#флаг агрегации
+        super().__init__()
         return
     def Set_sender_class_id(self,new_sender_class_id):
         self.sender_class_id=new_sender_class_id
         return
     def Set_recipient_class_id(self,new_recipient_class_id):
         self.recipient_class_id=new_recipient_class_id
-        return
-    def Set_type_of_the_number_of_sender_class(self,new_type_of_the_number_of_sender_class):
-        self.type_of_the_number_of_sender_class=new_type_of_the_number_of_sender_class
-        return
-    def Set_type_of_the_number_of_recipient_class(self,new_type_of_the_number_of_recipient_class):
-        self.type_of_the_number_of_recipient_class=new_type_of_the_number_of_recipient_class
         return
     def Set_role_sender(self,new_role_sender):
         self.role_sender=new_role_sender
@@ -2389,10 +2300,10 @@ class obj_Connection(Object):
         return self.sender_class_id
     def Get_recipient_class_id(self):
         return self.recipient_class_id
-    def Get_type_of_the_number_of_sender_class(self):
-        return self.type_of_the_number_of_sender_class
-    def Get_type_of_the_number_of_recipient_class(self):
-        return self.type_of_the_number_of_recipient_class
+    def Get_multiplicity_of_sender_class(self):
+        return self.multiplicity_of_sender_class
+    def Get_multiplicity_of_recipient_class(self):
+        return self.multiplicity_of_recipient_class
     def Get_role_sender(self):
         return self.role_sender
     def Get_role_recipient(self):
@@ -2401,88 +2312,65 @@ class obj_Connection(Object):
         return self.flag_composite
     def Get_flag_shared(self):
         return self.flag_shared
-    def Take_your_type(self,upper,lower):
-        if upper==lower:
-            if upper=="-1":
-                return 0
-            if upper=="0":
-                return 1
-            else:
-                return 4
-        if lower=="0":
-            if upper=="-1":
-                return 2
-            else:
-                return 3
-        else:
-            return 5
-    def Take_type_string_from_type_number(self,number):
-        if number==0:
-            return "*"
-        elif number==1:
-            return "0"
-        elif number==2:
-            return "0..*"
-        elif number==3:
-            return "0..1"
-        elif number==4:
-            return "1"
-        elif number==5:
-            return "1..*"
-        else:
-            return "None"
     def Parse_connection(self,root):
+        #???разобраться со всеми видами соединений
         local_root=root
-        for child in local_root.children:
-            if child.name=="memberend":
-                if self.recipient_class_id=="":
-                    self.recipient_class_id=child["xmi:idref"]
+        if local_root.has_attr("xmi:id"):
+            self.Set_id(local_root["xmi:id"])
+        if local_root.has_attr("xmi:type"):
+            self.Set_type(local_root["xmi:type"])
+        if local_root.has_attr("name"):
+            self.Set_name(local_root["name"])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.name+"' начал читаться из XML файла"]])
+        help_root=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":self.id})
+        if help_root!=None:
+            sender_root=help_root.find("source")
+            if sender_root!=None:
+                if sender_root.has_attr("xmi:idref"):
+                    self.sender_class_id=sender_root["xmi:idref"]
                 else:
-                    self.sender_class_id=child["xmi:idref"]
-            if child.name=="ownedend":
-                if child["xmi:id"]==self.recipient_class_id:
-                    self.recipient_class_id=child.contents[1]["xmi:idref"]
-                    if len(child.contents)>4:
-                        num1=child.contents[3]["value"]
-                        num2=child.contents[5]["value"]
-                        self.type_of_the_number_of_recipient_class=self.Take_your_type(num2,num1)
-                    else:
-                        self.type_of_the_number_of_recipient_class=1
-                    if child.has_attr("name"):
-                        self.role_recipient=child["name"]
-                    else:
-                        self.role_recipient="None"
+                    self.sender_class_id="None"
+                type=sender_root.find("type")
+                if type!=None:
+                    if type.has_attr("multiplicity"):
+                        self.multiplicity_of_sender_class=type["multiplicity"]
+                role=sender_root.find("role")
+                if role!=None:
+                    if role.has_attr("name"):
+                        self.role_sender=role["name"]
+            recipient_root=help_root.find("target")
+            if recipient_root!=None:
+                if recipient_root.has_attr("xmi:idref"):
+                    self.recipient_class_id=recipient_root["xmi:idref"]
                 else:
-                    self.sender_class_id=child.contents[1]["xmi:idref"]
-                    if len(child.contents)>4:
-                        num1=child.contents[3]["value"]
-                        num2=child.contents[5]["value"]
-                        self.type_of_the_number_of_sender_class=self.Take_your_type(num2,num1)
-                    else:
-                        self.type_of_the_number_of_recipient_class=1
-                    if child.has_attr("name"):
-                        self.role_sender=child["name"]
-                    else:
-                        self.role_sender="None"
-                    if child["aggregation"]=="composite":
-                        self.Set_flag_composite(True)
-                    if child["aggregation"]=="shared":
-                        self.Set_flag_shared(True)
-        if self.role_sender=="":
-            self.role_sender="None"
-        if self.role_recipient=="":
-            self.role_recipient="None"
+                    self.recipient_class_id="None"
+                type=recipient_root.find("type")
+                if type!=None:
+                    if type.has_attr("multiplicity"):
+                        self.multiplicity_of_recipient_class=type["multiplicity"]
+                    if type.has_attr("aggregation"):
+                        if type["aggregation"]=="composite":
+                            self.flag_composite=True
+                        elif type["aggregation"]=="shared":
+                            self.flag_shared=True
+                role=recipient_root.find("role")
+                if role!=None:
+                    if role.has_attr("name"):
+                        self.role_recipient=role["name"]
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.name+"' прочитан"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.name+"' добавляется в модель"]])
+        self.diagram.Add_object(self)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.name+"' добавлен в модель"]])
         return
     
 class obj_Use_Case(Object):
-    list_of_actors=[]
-    list_of_includions=[]#what is included in this Use Case (required)
-    list_of_extentions=[]#what extends this Use Case (optional, but possible)
-    def __init__(self):
+    def __init__(self,init_diagram):
+        self.diagram=init_diagram
         self.list_of_actors=[]
         self.parents_id=[]
-        self.list_of_includions=[]
-        self.list_of_extentions=[]
+        self.list_of_includions=[]#what is included in this Use Case (required)
+        self.list_of_extentions=[]#what extends this Use Case (optional, but possible)
+        super().__init__()
         return
     def Add_actor(self,new_actor):
         self.list_of_actors.append(new_actor)
@@ -2540,39 +2428,96 @@ class obj_Use_Case(Object):
         return
     def Parse_use_case(self,root):
         local_root=root
-        for child in local_root.children:
-            if child.name=="include":
-                self.list_of_includions.append(child["addition"])
-            if child.name=="extend":
-                new_extent=[]
-                new_extent.append(child["xmi:id"])
-                new_extent.append(child["extendedcase"])
-                self.list_of_extentions.append(new_extent)
-            if child.name=="generalization":
-                self.parents_id.append(child["general"])
+        help_root=None
+        if local_root.has_attr("xmi:id"):
+            self.id=local_root["xmi:id"]
+            help_root=self.diagram.model.extention_root.find("element",attrs={"xmi:idref":local_root["xmi:id"]})
+            if help_root!=None:
+                if help_root.has_attr("name"):
+                    self.name=help_root["name"]
+                if help_root.has_attr("xmi:type"):
+                    self.type=help_root["xmi:type"]
+                links=help_root.find("links")
+                if links!=None:
+                    Generalizations=links.find_all("Generalization")
+                    if Generalizations!=None:
+                        for Generalization in Generalizations:
+                            if Generalization.has_attr("start") and help_root.has_attr("xmi:idref") and Generalization["start"]==help_root["xmi:idref"] and Generalization.has_attr("end"):
+                                self.Add_parents(Generalization["end"])
+                    UseCases=help_root.find_all("UseCase")
+                    if UseCases!=None:
+                        for UseCase in UseCases:
+                            if UseCase.has_attr("xmi:id") and UseCase.has_attr("end") and UseCase["end"]==self.id:
+                                connector=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":UseCase["xmi:id"]})
+                                if connector!=None:
+                                    properties=connector.find("properties")
+                                    if properties!=None and properties.has_attr("stereotype") and properties["stereotype"]=="extend":
+                                        if connector.find("source") and connector.source.has_attr("xmi:idref"):
+                                            new_extention=[]
+                                            new_extention.append(connector.source["xmi:idref"])
+                                            node=self.diagram.model.model_root.find("annotatedElement",attrs={"xmi:idref":connector["xmi:idref"]})
+                                            if node!=None:
+                                                node=node.parent
+                                                if node.has_attr("body"):
+                                                    result=re.findall("([^ \|]{1}[^\|]*[^ \|]{1})",node["body"])
+                                                    for i in range(0,len(result)):
+                                                        result[i]=result[i].replace("&amp;","&")
+                                                        result[i]=result[i].replace("&gt;",">")
+                                                        result[i]=result[i].replace("&lt;","<")
+                                                    new_extention.append(result)
+                                            self.Add_extention(new_extention)
+                            elif UseCase.has_attr("xmi:id") and UseCase.has_attr("start") and UseCase["start"]==self.id:
+                                connector=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":UseCase["xmi:id"]})
+                                if connector!=None:
+                                    properties=connector.find("properties")
+                                    if properties!=None and properties.has_attr("stereotype") and properties["stereotype"]=="include":
+                                        if connector.find("target") and connector.target.has_attr("xmi:idref"):
+                                            self.Add_includion(connector.target["xmi:idref"])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' начал читаться из XML файла"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' прочитан"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавляется в модель"]])
+        self.diagram.Add_object(self)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавлен в модель"]])
         return
 
 class obj_LifeLine(Object):
-    connected_object_id=""
-    def __init__(self):
-        self.connected_object_id=""
+    def __init__(self,init_diagram):
+        self.diagram=init_diagram
+        self.connected_object_id="None"
+        super().__init__()
         return
     def Set_connected_object_id(self,new_connected_object_id):
         self.connected_object_id=new_connected_object_id
         return
     def Get_connected_object_id(self):
         return self.connected_object_id
-
-class obj_Time_connection(Object):
-    id_point_from=""
-    id_point_to=""
-    type_connection=""
-    kind_connection=""
-    def __init__(self):
-        self.id_point_from=""
-        self.id_point_to=""
-        self.type_connection=""
-        self.kind_connection=""
+    def Parse_LifeLine(self,root):
+        local_root=root
+        if local_root.has_attr("xmi:id"):
+            self.id=local_root["xmi:id"]
+        if local_root.has_attr("xmi:type"):
+            self.type=local_root["xmi:type"]
+        if local_root.has_attr("name"):
+            self.name=local_root["name"]
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' начал читаться из XML файла"]])
+        if local_root.has_attr("represents"):
+            represents=local_root["represents"]
+            represents=self.diagram.model.model_root.find("ownedAttribute",attrs={"xmi:id":represents})
+            if represents!=None and represents.find("type")!=None and represents.type.has_attr("xmi:idref"):
+                    self.connected_object_id=represents.type["xmi:idref"]
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' прочитан"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавляется в модель"]])
+        self.diagram.Add_object(self)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавлен в модель"]])
+        
+class obj_Message(Object):
+    def __init__(self,init_diagram):
+        self.diagram=init_diagram
+        self.id_point_from="None"
+        self.id_point_to="None"
+        self.type_connection="None"
+        self.kind_connection="None"
+        super().__init__()
         return
     def Set_id_point_from(self,new_id_point_from):
         self.id_point_from=new_id_point_from
@@ -2594,15 +2539,52 @@ class obj_Time_connection(Object):
         return
     def Get_kind_connection(self):
         return self.kind_connection
+    def Parse_Message(self,root):
+        local_root=root
+        if local_root.has_attr("name"):
+            self.name=local_root["name"]
+        if local_root.has_attr("xmi:type"):
+            self.type=local_root["xmi:type"]
+        if local_root.has_attr("xmi:id"):
+            self.id=local_root["xmi:id"]
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' начал читаться из XML файла"]])
+        if local_root.has_attr("sendEvent"):
+            fragment=self.diagram.model.model_root.find("fragment",attrs={"xmi:id":local_root["sendEvent"]})
+            if fragment!=None and fragment.has_attr("covered"):
+                smth=self.diagram.model.model_root.find(attrs={"xmi:id":fragment["covered"]})
+                if smth!=None:
+                    self.id_point_from=smth["xmi:id"]
+                else:
+                    self.id_point_from=local_root["sendEvent"]
+            else:
+                self.id_point_from=local_root["sendEvent"]
+        if local_root.has_attr("receiveEvent"):
+            fragment=self.diagram.model.model_root.find("fragment",attrs={"xmi:id":local_root["receiveEvent"]})
+            if fragment!=None:
+                smth=self.diagram.model.model_root.find(attrs={"xmi:id":fragment["covered"]})
+                if smth!=None:
+                    self.id_point_to=smth["xmi:id"]
+                else:
+                    self.id_point_to=local_root["receiveEvent"]
+            else:
+                self.id_point_to=local_root["receiveEvent"]
+        if local_root.has_attr("messageKind"):
+            self.kind_connection=local_root["messageKind"]
+        if local_root.has_attr("messageSort"):
+            self.type_connection=local_root["messageSort"]
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' прочитан"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавляется в модель"]])
+        self.diagram.Add_object(self)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавлен в модель"]])
+        return
 
 class obj_Alternative(Object):
-    type_alternative=""
-    list_of_covered_lifeline=[]
-    list_of_alternatives=[]
-    def __init__(self):
-        self.type_alternative=""
+    def __init__(self,init_diagram):
+        self.diagram=init_diagram
+        self.type_alternative="None"
         self.list_of_covered_lifeline=[]
         self.list_of_alternatives=[]
+        super().__init__()
         return
     def Set_type_alternative(self,new_type_alternative):
         self.type_alternative=new_type_alternative
@@ -2631,6 +2613,15 @@ class obj_Alternative(Object):
             return self.list_of_alternatives[number_of_alternative]
     def Parse_alternative(self,root):
         local_root=root
+        if local_root.has_attr("xmi:id"):
+            self.id=local_root["xmi:id"]
+        if local_root.has_attr("xmi:type"):
+            self.type=local_root["xmi:type"]
+        if local_root.has_attr("name"):
+            self.name=local_root["name"]
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' начал читаться из XML файла"]])
+        if local_root.has_attr("interactionOperator"):
+            self.type_alternative=local_root["interactionOperator"]
         for child in local_root.children:
             if child.name=="covered":
                 self.Add_covered_lifeline(child["xmi:idref"])
@@ -2644,6 +2635,10 @@ class obj_Alternative(Object):
                         new_alernative_variavnt.append(elements["covered"])
                 if len(new_alernative_variavnt)!=0:
                     self.Add_alternative(new_alernative_variavnt)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' прочитан"]])
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавляется в модель"]])
+        self.diagram.Add_object(self)
+        self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавлен в модель"]])
         return
 
 controller=controller()
