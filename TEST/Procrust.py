@@ -16,7 +16,7 @@ from threading import Thread
 from bs4 import BeautifulSoup
 from rnnmorph.predictor import RNNMorphPredictor
 
-coding_xml="cp1251"
+coding_xml="utf-8"
 coding_other_files="utf-8"
 file_name_with_param="Params.txt"
 file_with_prom_comments="Prom_comments.txt"
@@ -58,7 +58,6 @@ class controller:
 
 class visual:
     def __init__(self,init_controller):
-        self.number_of_login_windows=0
         self.number_of_opened_frames=3
         self.current_window=None
         self.current_widget=None
@@ -68,7 +67,6 @@ class visual:
         self.thread1=Thread(target=self.Start,args=())
         self.thread1.start()
         
-        self.number_rows_in_string_in_tree=1
         self.size_of_text=11
         self.size_of_titles=self.size_of_text+4
         
@@ -422,35 +420,30 @@ class visual:
                     tag="second"
                 self.AddRow(curr_comment,tag)
     def LogIn(self):
-        if self.number_of_login_windows==0:
-            self.number_of_login_windows+=1
-            self.exit_button['state']='disable'
-            
-            login_window=Tk()
-            login_window.title("Окно ввода пароля")
-            login_window.geometry(str(math.floor(self.main_window.winfo_screenwidth()/4))+'x'+str(math.floor(self.main_window.winfo_screenheight()/5)))
-            #login_window.attributes('-toolwindow', True)
-            login_window.protocol("WM_DELETE_WINDOW", self.LogOut)
+        
+        login_window=Toplevel()
+        login_window.title("Окно ввода пароля")
+        login_window.geometry(str(math.floor(self.main_window.winfo_screenwidth()/4))+'x'+str(math.floor(self.main_window.winfo_screenheight()/5)))
+        #login_window.attributes('-toolwindow', True)
+        login_window.protocol("WM_DELETE_WINDOW", self.LogOut)
 
-            login_window_label_1=Label(login_window, text="Введите пароль:")
-            login_window_label_1.pack(anchor=CENTER)
+        login_window_label_1=Label(login_window, text="Введите пароль:")
+        login_window_label_1.pack(anchor=CENTER)
 
-            login_window_entry_password=Entry(login_window,justify=CENTER)
-            login_window_entry_password.pack(expand=True,anchor=CENTER,fill="both")
-            login_window_button=Button(login_window, text="Войти в режим администратора", command=self.CheckPass)
-            login_window_button.pack(anchor=CENTER)
+        login_window_entry_password=Entry(login_window,justify=CENTER)
+        login_window_entry_password.pack(expand=True,anchor=CENTER,fill="both")
+        login_window_button=Button(login_window, text="Войти в режим администратора", command=self.CheckPass)
+        login_window_button.pack(anchor=CENTER)
 
-            self.current_window=login_window
-            self.current_widget=login_window_entry_password
+        login_window.grab_set()
+        self.current_window=login_window
+        self.current_widget=login_window_entry_password
     def LogOut(self):
+        self.current_window.grab_release()
         self.current_window.destroy()
-        self.number_of_login_windows=0
         self.current_window=0
-        self.exit_button['state']='normal'
     def ExitProrust(self):
         self.controller.AddCommand(["Закончить работу"])
-        if self.number_of_login_windows==1:
-            self.LogOut()
         self.main_window.quit()
     def CheckPass(self):
         params_file=open(file_path_with_params,"r",encoding=coding_other_files)
@@ -564,10 +557,6 @@ class visual:
             self.thread1.join()
     
 class Object:
-    id="None"
-    type="None"
-    name="None"
-    parents_id=[]#A list of strings
     def __init__(self):
         self.id="None"
         self.type="None"
@@ -617,7 +606,7 @@ class Model(Object):
         self.xml_file_path=None
         self.xml_root=None
         self.model_root=None
-        self.extention_root=None
+        self.extension_root=None
         self.controller=init_controller
         self.list_of_commands=[]
         self.list_of_diagrams=[]#List of obj_Diagram type objects
@@ -647,7 +636,7 @@ class Model(Object):
     def SetRoots(self,root):
         self.xml_root=root
         self.model_root=self.xml_root.find("uml:Model")
-        self.extention_root=self.xml_root.find("xmi:Extension")
+        self.extension_root=self.xml_root.find("xmi:Extension")
     def ResetXMLFile(self):
         file=open(self.xml_file_path,"w",encoding=coding_other_files)
         file.write(self.xml_root.prettify(formatter="minimal"))
@@ -690,18 +679,17 @@ class Model(Object):
         xml_tree=BeautifulSoup(xml_file,"xml")
         xml_file.close()
         self.SetRoots(xml_tree)
-        model_package=xml_tree.find("uml:Model")
-        model_data=model_package.find("packagedElement")
+        model_package=self.model_root
+        model_data=model_package.find_all("umldi:Diagram")
         counter=0
-        self.name=model_data["name"]
-        for child in model_data.children:
-            if child!='\n':
-                counter+=1
-                our_diagram=obj_Diagram(self)
-                self.controller.AddCommand(["Visual",["Состояние прогресса",counter,100]])
-                our_diagram.Parse_diaram(child)
-                self.Add_diagram(our_diagram)
-                del our_diagram
+        self.name=model_package.find("packagedElement")["name"]
+        for diagram in model_data:
+            counter+=1
+            our_diagram=obj_Diagram(self)
+            self.controller.AddCommand(["Visual",["Состояние прогресса",counter,100]])
+            our_diagram.Parse_diaram(diagram)
+            self.Add_diagram(our_diagram)
+            del our_diagram
         self.Completion_of_the_Model_formation()
         self.controller.AddCommand(["Visual",["Информация о процессе 1","Завершено чтение и формирование представления модели <"+self.Get_name()+">","Финальный"]])
         self.Search_for_recommendations()
@@ -936,7 +924,12 @@ class Model(Object):
                     data_livelines_data=[]
                     our_list_covered_lifelines=our_list_of_objects[i].Get_list_of_covered_lifeline()
                     for j in range(0,len(our_list_covered_lifelines)):
-                        data_livelines_data.append("ID временной линии: "+our_list_covered_lifelines[j]+"("+self.Find_object_in_Model(our_list_covered_lifelines[j]).Get_name()+")")
+                        data=self.Find_object_in_Model(our_list_covered_lifelines[j])
+                        if data!=None:
+                            data=data.name
+                        else:
+                            data="нет"
+                        data_livelines_data.append("ID временной линии: "+our_list_covered_lifelines[j]+"("+data+")")
                     livelines_data.append(data_livelines_data)
                     data_object_mess.append(livelines_data)
                     our_list_of_alternatives=our_list_of_objects[i].Get_list_of_alternatives()
@@ -948,8 +941,26 @@ class Model(Object):
                         curr_alternative.append(our_list_of_alternatives[j][0])
                         data_curr_alternative=[]
                         if len(our_list_of_alternatives[j])!=1:
-                            data_curr_alternative.append("ID временной линии, которая вызывает данную процедуру: "+our_list_of_alternatives[j][1]+"("+self.Find_object_in_Model(our_list_of_alternatives[j][1]).Get_name()+")")
-                            data_curr_alternative.append("ID временной линии, в которой вызывается данная процедура: "+our_list_of_alternatives[j][2]+"("+self.Find_object_in_Model(our_list_of_alternatives[j][2]).Get_name()+")")
+                            number_mess=0
+                            for k in range(1,len(our_list_of_alternatives[j]),2):
+                                number_mess+=1
+                                new_mess=[]
+                                data_new_mess=[]
+                                new_mess.append("Вызов "+str(number_mess))
+                                data=self.Find_object_in_Model(our_list_of_alternatives[j][k])
+                                if data==None:
+                                    data="нет"
+                                else:
+                                    data=data.Get_name()
+                                data_new_mess.append("ID временной линии, которая вызывает данную процедуру: "+our_list_of_alternatives[j][k]+"("+data+")")
+                                data=self.Find_object_in_Model(our_list_of_alternatives[j][k+1])
+                                if data==None:
+                                    data="нет"
+                                else:
+                                    data=data.Get_name()
+                                data_new_mess.append("ID временной линии, в которой вызывается данная процедура: "+our_list_of_alternatives[j][k+1]+"("+data+")")
+                                new_mess.append(data_new_mess)
+                                data_curr_alternative.append(new_mess)
                         curr_alternative.append(data_curr_alternative)
                         data_alternatives_mess.append(curr_alternative)
                     alternatives_mess.append(data_alternatives_mess)
@@ -1011,10 +1022,10 @@ class Model(Object):
         #print(self.list_of_recomendations)
         for group in self.list_of_recomendations:
             for recommendation in group[1]:
-                list_of_objects=re.findall('\'[\d\w ]*\'',recommendation[0])
+                list_of_objects=list(set(re.findall("'([^']+)'",recommendation[0])))
                 new_string=group[0]+"/"+recommendation[0]+"/?!#"
                 for object in list_of_objects:
-                    new_string+=object+","
+                    new_string+="'"+object+"',"
                 if new_string[-1]!="#":
                     new_string=new_string[0:-1]
                 new_string+="#!?\n"
@@ -1163,7 +1174,7 @@ class Model(Object):
             curr_type=string.group(1)
             curr_comm=string.group(2)
             curr_list_of_obj=string.group(3)
-            curr_list_of_obj=re.findall("'([ _a-zA-Z0-9'^]*)'",curr_list_of_obj)
+            curr_list_of_obj=re.findall("'([^']+)'",curr_list_of_obj)
             for curr_object in curr_list_of_obj:
                 founded_group=None
                 for objects_group in old_list_of_comments:
@@ -1174,10 +1185,12 @@ class Model(Object):
                     old_list_of_comments.append([curr_object,[[curr_comm,curr_type]]])
                 else:
                     founded_group[1].append([curr_comm,curr_type])
+        #print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         for group in self.list_of_recomendations:
             if group[0]!=this_name_of_group_recomendation:
                 for recomendation in group[1]:
                     flag_exist=False
+                    #поиск повторяющейся ркомендации или замечания
                     for objects_group in old_list_of_comments:
                         for comments in  objects_group[1]:
                             if recomendation[0]==comments[0]:
@@ -1186,28 +1199,38 @@ class Model(Object):
                         if flag_exist==True:
                             break
                     if flag_exist==True:
-                        new_list_of_objects=re.findall("'([ _a-zA-Z0-9'^]*)'",recomendation[0])
+                        new_list_of_objects=re.findall("'([^']+)'",recomendation[0])
+                        #print(recomendation[0])
                         #print(new_list_of_objects)
-                        list_of_group_objects=[]#[имя лбъекта, список старых замечаний с этим именем объект, список старых замечаний с этим именем объекта]
+                        #создаем список объектов из данного замечания и связанных с ними замечаниями из прошлой и новой резолюции
+                        list_of_group_objects=[]#[имя объекта, список старых замечаний с этим именем объект, список старых замечаний с этим именем объекта]
+                        #и заполняем его
                         for object in new_list_of_objects:
+                            #print("Object:"+object)
                             list_of_group_objects.append([object,[]])
                             flag_exist=False
+                            #заполнение прошлыми замечаниями
                             for objects_group in old_list_of_comments:
                                 if objects_group[0]==object:
+                                    #print(objects_group)
                                     for elem in objects_group[1]:
+                                        #print(elem)
                                         if elem[1]!=this_name_of_group_recomendation:
+                                            #print("success")
                                             list_of_group_objects[-1][-1].append(elem[0])
                                     flag_exist=True
                                     break
+                            #если ни одного замечания не было найдео, то просто добавляем пустой список
                             if flag_exist==False:
                                 list_of_group_objects[-1].append([])
                             list_of_group_objects[-1].append([])
                             #print("Текущие предложения:",self.list_of_recomendations)
+                            #заполнение новыми замечаниями
                             for curr_group in self.list_of_recomendations:
                                 #print(curr_group[0])
                                 if curr_group[0]!=this_name_of_group_recomendation:
                                     for curr_recomendation in curr_group[1]:
-                                        curr_objects_list=re.findall("'([ _a-zA-Z0-9'^]*)'",curr_recomendation[0])
+                                        curr_objects_list=re.findall("'([^']+)'",curr_recomendation[0])
                                         for curr_objects in curr_objects_list:
                                            #t(curr_objects,"?",object)
                                             if curr_objects==object:
@@ -1231,12 +1254,13 @@ class Model(Object):
                             if flag_same==True:
                                 self.Add_recomendation("Предложенная рекоммендация:<"+recomendation[0]+">была проигнорирована, в дальнейшем возможны конфликты и ошибки",this_name_of_group_recomendation,"None",[])
                         if count_new>count_old:
+                            #print(list_of_group_objects)
                             self.Add_recomendation("Предложенная рекоммендация:<"+recomendation[0]+">была проигнорирована, обратите внимание, что возникли новые рекомендации, связанные с данным объектом или диаграммой",this_name_of_group_recomendation,"None",[])
         self.controller.AddCommand(["Visual",["Состояние прогресса",1,1]])
         return
     def GetSolution(self,data):
         if data[0]=="Вынос функции в родителя":
-            list_of_names=re.findall("('[ a-zA-Z0-9]+')",data[1])
+            list_of_names=re.findall("('[^']+')",data[1])
             function_name=list_of_names[0][1:-1]
             curr_diagram=self.Find_object_in_Model(data[2][0])
             parent_class=self.Find_object_in_Model(data[2][len(data[2])-1])
@@ -1244,14 +1268,14 @@ class Model(Object):
             for i in range(1,len(data[2])-1):
                 list_of_childs.append(self.Find_object_in_Model(data[2][i]))
             parent_node=self.model_root.find("packagedElement",attrs={"xmi:id":parent_class.id})
-            parent_help_node=self.extention_root.find("element",attrs={"xmi:idref":parent_class.id})
+            parent_help_node=self.extension_root.find("element",attrs={"xmi:idref":parent_class.id})
             if parent_node!=None and parent_help_node!=None:
                 for child in list_of_childs:
-                    if not self.model_root.find("packagedElement",attrs={"xmi:id":child.id}) or not self.extention_root.find("element",attrs={"xmi:idref":child.id}) or not self.model_root.find("packagedElement",attrs={"xmi:id":child.id}).find("ownedOperation",attrs={"name":function_name}) or not self.extention_root.find("element",attrs={"xmi:idref":child.id}).find("operation",attrs={"name":function_name}):
+                    if not self.model_root.find("packagedElement",attrs={"xmi:id":child.id}) or not self.extension_root.find("element",attrs={"xmi:idref":child.id}) or not self.model_root.find("packagedElement",attrs={"xmi:id":child.id}).find("ownedOperation",attrs={"name":function_name}) or not self.extension_root.find("element",attrs={"xmi:idref":child.id}).find("operation",attrs={"name":function_name}):
                         self.controller.AddCommand(["Visual",["Результат выполнения операции","Ошибка"]])
                         return
                 first_child=self.model_root.find("packagedElement",attrs={"xmi:id":list_of_childs[0].id})
-                first_child_help=self.extention_root.find("element",attrs={"xmi:idref":list_of_childs[0].id})
+                first_child_help=self.extension_root.find("element",attrs={"xmi:idref":list_of_childs[0].id})
                 if first_child.find("ownedOperation",attrs={"name":function_name}) and first_child.find("ownedOperation",attrs={"name":function_name}).has_attr("xmi:id") and first_child_help.find("operation",attrs={"xmi:idref":first_child.find("ownedOperation",attrs={"name":function_name})["xmi:id"]}):
                     operation=first_child.find("ownedOperation",attrs={"name":function_name})
                     operation_help=first_child_help.find("operation",attrs={"xmi:idref":first_child.find("ownedOperation",attrs={"name":function_name})["xmi:id"]})
@@ -1262,7 +1286,7 @@ class Model(Object):
                     parent_help_node.operations.append(BeautifulSoup(str(operation_help),"xml"))
                     for child in list_of_childs:
                         curr_child=self.model_root.find("packagedElement",attrs={"xmi:id":child.id})
-                        curr_child_help=self.extention_root.find("element",attrs={"xmi:idref":child.id})
+                        curr_child_help=self.extension_root.find("element",attrs={"xmi:idref":child.id})
                         curr_child.find("ownedOperation",attrs={"name":function_name}).decompose()
                         curr_child_help.find("operation",attrs={"name":function_name}).decompose()                        
                         flag_exist=False
@@ -1290,7 +1314,6 @@ class obj_Diagram(Object):
         self.model=init_model
         self.list_of_nouns=[]#[[сущевтвительное,число повторений существительного],...,[сущевтвительное,число повторений существительного]]
         self.list_of_verbs=[]#[[глагол,имя объекта-родителя этого глагола],...,[глагол,имя объекта-родителя этого глагола]]
-        self.model.Find_object_in_Model
         super().__init__()
         return
     def Add_object(self,new_object):
@@ -1339,30 +1362,7 @@ class obj_Diagram(Object):
                 words.append(current_fraze[begin+1:end+1])
         words=predictor.predict(words)
         for j in range(0,len(words)):
-            if j<(len(words)-1) and ((words[j].normal_form.casefold()=="turn" and words[j+1].normal_form.casefold()=="on") or (words[j].normal_form.casefold()=="switch" and words[j+1].normal_form.casefold()=="off") or (words[j].normal_form.casefold()=="log" and words[j+1].normal_form.casefold()=="in") or (words[j].normal_form.casefold()=="log" and words[j+1].normal_form.casefold()=="out")):
-                current_fraze=words[j].normal_form.casefold()+" "+words[j+1].normal_form.casefold()
-                flag_exist=False
-                for k in range(0,len(self.list_of_verbs)):
-                    if current_fraze==self.list_of_verbs[k]:
-                        flag_exist=True
-                        break
-                if flag_exist==False:
-                    new_verb=[]
-                    new_verb.append(current_fraze)
-                    new_verb.append(object.Get_name())
-                    self.list_of_verbs.append(new_verb)
-            elif words[j].normal_form.casefold()=="open" or words[j].normal_form.casefold()=="close" or words[j].normal_form.casefold()=="send" or words[j].normal_form.casefold()=="recieve" or words[j].normal_form.casefold()=="find" or words[j].normal_form.casefold()=="edit" or words[j].normal_form.casefold()=="start" or words[j].normal_form.casefold()=="finish" or words[j].normal_form.casefold()=="download" or words[j].normal_form.casefold()=="upload" or words[j].normal_form.casefold()=="select":
-                flag_exist=False
-                for k in range(0,len(self.list_of_verbs)):
-                    if words[j].normal_form.casefold()==self.list_of_verbs[k]:
-                        flag_exist=True
-                        break
-                if flag_exist==False:
-                    new_verb=[]
-                    new_verb.append(words[j].normal_form.casefold())
-                    new_verb.append(object.Get_name())
-                    self.list_of_verbs.append(new_verb)
-            elif words[j].pos=="VERB":
+            if words[j].pos=="VERB":
                 flag_exist=False
                 for k in range(0,len(self.list_of_verbs)):
                     if self.list_of_verbs[k]==words[j].normal_form:
@@ -1372,6 +1372,7 @@ class obj_Diagram(Object):
                     new_verb=[]
                     new_verb.append(words[j].normal_form.casefold())
                     new_verb.append(object.Get_name())
+                    self.list_of_verbs.append(new_verb)
             elif words[j].pos=="NOUN":
                 flag_extention=False
                 for k in range(0,len(self.list_of_nouns)):
@@ -1387,23 +1388,30 @@ class obj_Diagram(Object):
         return
     def Parse_diaram(self,root):
         local_root=root
-        if local_root.has_attr("xmi:id") and self.model.model_root.find("umldi:Diagram",attrs={"modelElement":local_root["xmi:id"]}):
-            self.id=local_root["xmi:id"]
-            self.type=self.model.model_root.find("umldi:Diagram",attrs={"modelElement":local_root["xmi:id"]})
-            if self.type.has_attr("xmi:id") and self.model.extention_root.find("diagram",attrs={"xmi:id":self.type["xmi:id"]}):
-                self.type=self.model.extention_root.find("diagram",attrs={"xmi:id":self.type["xmi:id"]})
-                if self.type.find("properties") and self.type.properties.has_attr("name") and self.type.properties.has_attr("type"):
-                    self.name=self.type.properties["name"]
-                    self.type=self.type.properties["type"]
+        if local_root.has_attr("modelElement"):
+            self.id=local_root["modelElement"]
+        self.type=local_root
+        if self.type.has_attr("xmi:id") and self.model.extension_root.find("diagram",attrs={"xmi:id":self.type["xmi:id"]}):
+            self.type=self.model.extension_root.find("diagram",attrs={"xmi:id":self.type["xmi:id"]})
+            if self.type.find("properties") and self.type.properties.has_attr("name") and self.type.properties.has_attr("type"):
+                self.name=self.type.properties["name"]
+                self.type=self.type.properties["type"]
         self.model.controller.AddCommand(["Visual",["Информация о процессе 1","Идёт чтение диаграммы <"+self.name+">","Обычный"]])
         self.Parse_node(local_root)
         return
     def Parse_node(self,root):
         local_root=root
-        for child in local_root.children:
-            if child.name=="packagedElement" or child.name=="nestedClassifier" or child.name=="lifeline" or child.name=="message" or child.name=="ownedAttribute" or child.name=="ownedComment" or child.name=="ownedBehavior" or child.name=="fragment":
-                if child["xmi:type"]=="uml:Package" or child["xmi:type"]=="uml:Collaboration" or (child["xmi:type"]=="uml:Interaction" and child.name=="ownedBehavior"):
-                    self.Parse_node(child)
+        for local_elem in local_root.children:
+            child=None
+            list_of_tags=["packagedElement","lifeline","message","fragment"]
+            if local_elem!="\n":
+                for tag in list_of_tags:
+                    child=self.model.model_root.find(tag,attrs={"xmi:id":local_elem["modelElement"]})
+                    if child!=None:
+                        break
+            if child!=None and (child.name=="packagedElement" or child.name=="nestedClassifier" or child.name=="lifeline" or child.name=="message" or child.name=="ownedAttribute" or child.name=="ownedComment" or child.name=="ownedBehavior" or child.name=="fragment"):
+                """if child["xmi:type"]=="uml:Package" or child["xmi:type"]=="uml:Collaboration" or (child["xmi:type"]=="uml:Interaction" and child.name=="ownedBehavior"):
+                    self.Parse_node(child)"""
                 if child["xmi:type"]=="uml:Class" or child["xmi:type"]=="uml:Component" or child["xmi:type"]=="uml:Interface" or child["xmi:type"]=="uml:AssociationClass":
                     new_obj_class=obj_Class(self)
                     new_obj_class.Parse_class(child)
@@ -1489,11 +1497,32 @@ class obj_Diagram(Object):
                             target.Add_param(additional_param)
                         if object.Get_flag_composite()==True:
                             source.Set_independent_existence(False)
+        if self.type=="Sequence":
+            for object in self.list_of_objects:
+                if object.type=="uml:Message":
+                    lifeline=object.Get_id_point_from()
+                    if lifeline!=None:
+                        lifeline=self.Find_object(lifeline)
+                        if lifeline==None:
+                            lifeline=self.model.model_root.find("lifeline",attrs={"xmi:id":object.Get_id_point_from()})
+                            if lifeline!=None:
+                                new_obj_lifeLine=obj_LifeLine(self)
+                                new_obj_lifeLine.Parse_LifeLine(lifeline)
+                                del new_obj_lifeLine
+                    lifeline=object.Get_id_point_to()
+                    if lifeline!=None:
+                        lifeline=self.Find_object(lifeline)
+                        if lifeline==None:
+                            lifeline=self.model.model_root.find("lifeline",attrs={"xmi:id":object.Get_id_point_to()})
+                            if lifeline!=None:
+                                new_obj_lifeLine=obj_LifeLine(self)
+                                new_obj_lifeLine.Parse_LifeLine(lifeline)
+                                del new_obj_lifeLine
         return
     def UsualCheck(self):
         global predictor
         if predictor==None:
-            predictor=RNNMorphPredictor(language="en")
+            predictor=RNNMorphPredictor(language="ru")
         if len(self.list_of_objects)==0:
             self.model.Add_recomendation("Диаграмма '"+self.name+"' пустая, рекомендуется внести в неё элементы","Детальность модели","None",[])
         local_numbers=0
@@ -1638,10 +1667,11 @@ class obj_Diagram(Object):
                                     flag_exist=False
                                     #print("List_of_ext:")
                                     #print(list_of_extentions[1])
-                                    for node_condition in list_of_extentions[1]:
-                                        if condition[0]==node_condition:
-                                            flag_exist=True
-                                            break
+                                    if len(list_of_extentions)==2:
+                                        for node_condition in list_of_extentions[1]:
+                                            if condition[0]==node_condition:
+                                                flag_exist=True
+                                                break
                                     if flag_exist==False:
                                         self.model.Add_recomendation("Рекомендуется добавить условие '"+condition[0]+"' из '"+list_of_objects[i].name+"' из '"+self.name+"' в расширение '"+self.model.Find_object_in_Model(list_of_extentions[0]).name+"' в '"+current_use_case_diagram.name+"'","Детальность модели","None",[])
                 if counter<2:
@@ -1699,7 +1729,7 @@ class obj_Diagram(Object):
             for i in range(0,len(self.model.Get_list_of_diagrams())):
                 if self.model.Get_diagram(i).Get_type()=="Logical":
                     list_of_class_diagams.append(self.model.Get_diagram(i))
-            for i in range(0,len(self.list_of_nouns)):                
+            for i in range(0,len(self.list_of_nouns)):
                 if self.list_of_nouns[i][1]>=2:
                     flag_exist=False
                     for j in range(0,len(list_of_class_diagams)):
@@ -1720,7 +1750,6 @@ class obj_Diagram(Object):
             for i in range(0,len(self.model.Get_list_of_diagrams())):
                 if self.model.Get_diagram(i).Get_type()=="Logical":
                     list_of_class_diagams.append(self.model.Get_diagram(i))
-            #print("Список глаголов:",self.list_of_verbs)
             for i in range(0,len(self.list_of_verbs)):
                 current_verb=self.list_of_verbs[i]
                 current_sequence_diagram=None
@@ -1733,16 +1762,16 @@ class obj_Diagram(Object):
                             break
                 if current_sequence_diagram!=None:
                     current_list_of_recommended_sequence=[]
-                    if current_verb[0]=="turn on" or current_verb[0]=="switch off":
+                    if current_verb[0]=="включить" or current_verb[0]=="выключить":
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["turn on",False])
-                            current_list_of_recommended_sequence.append(["switch off",False])
-                        elif current_verb[0]=="turn on":
-                            current_list_of_recommended_sequence.append(["turn on",True])
-                            current_list_of_recommended_sequence.append(["switch off",False])
+                            current_list_of_recommended_sequence.append(["включить",False])
+                            current_list_of_recommended_sequence.append(["выключить",False])
+                        elif current_verb[0]=="включить":
+                            current_list_of_recommended_sequence.append(["включить",True])
+                            current_list_of_recommended_sequence.append(["выключить",False])
                         else:
-                            current_list_of_recommended_sequence.append(["turn on",False])
-                            current_list_of_recommended_sequence.append(["switch off",True])
+                            current_list_of_recommended_sequence.append(["включить",False])
+                            current_list_of_recommended_sequence.append(["выключить",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1765,23 +1794,23 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'turn on' и 'switch off', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'включить' и 'выключить', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'turn on', так как существует системный вызов 'switch off'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'включить', так как существует системный вызов 'выключить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'switch off', так как существует системный вызов 'turn on'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'выключить', так как существует системный вызов 'включить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'turn on' поставить выше системного вызова 'switch off'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="open" or current_verb[0]=="close":
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'включить' поставить выше системного вызова 'выключить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="октрыть" or current_verb[0]=="закрыть":
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["open",False])
-                            current_list_of_recommended_sequence.append(["close",False])
-                        elif current_verb[0]=="open":
-                            current_list_of_recommended_sequence.append(["open",True])
-                            current_list_of_recommended_sequence.append(["close",False])
+                            current_list_of_recommended_sequence.append(["октрыть",False])
+                            current_list_of_recommended_sequence.append(["закрыть",False])
+                        elif current_verb[0]=="октрыть":
+                            current_list_of_recommended_sequence.append(["октрыть",True])
+                            current_list_of_recommended_sequence.append(["закрыть",False])
                         else:
-                            current_list_of_recommended_sequence.append(["open",False])
-                            current_list_of_recommended_sequence.append(["close",True])
+                            current_list_of_recommended_sequence.append(["октрыть",False])
+                            current_list_of_recommended_sequence.append(["закрыть",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1804,23 +1833,23 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'open' и 'close', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'открыть' и 'закрыть', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'open', так как существует системный вызов 'close'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'открыть', так как существует системный вызов 'закрыть'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'close', так как существует системный вызов 'open'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'закрыть', так как существует системный вызов 'открыть'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'open' поставить выше системного вызова 'close'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="log in" or current_verb[0]=="log out":
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'открыть' поставить выше системного вызова 'закрыть'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="войти" or current_verb[0]=="выйти":
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["log in",False])
-                            current_list_of_recommended_sequence.append(["log out",False])
-                        elif current_verb[0]=="log in":
-                            current_list_of_recommended_sequence.append(["log in",True])
-                            current_list_of_recommended_sequence.append(["log out",False])
+                            current_list_of_recommended_sequence.append(["войти",False])
+                            current_list_of_recommended_sequence.append(["выйти",False])
+                        elif current_verb[0]=="войти":
+                            current_list_of_recommended_sequence.append(["войти",True])
+                            current_list_of_recommended_sequence.append(["выйти",False])
                         else:
-                            current_list_of_recommended_sequence.append(["log in",False])
-                            current_list_of_recommended_sequence.append(["log out",True])
+                            current_list_of_recommended_sequence.append(["войти",False])
+                            current_list_of_recommended_sequence.append(["выйти",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1843,23 +1872,23 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'log in' и 'log out', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'войти' и 'выйти', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'log in', так как существует системный вызов 'log out'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'войти', так как существует системный вызов 'выйти'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'log out', так как существует системный вызов 'log in' и это может повысить безопасность ситемных взаимодейтсвий в данном сценарии","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'выйти', так как существует системный вызов 'войти' и это может повысить безопасность ситемных взаимодейтсвий в данном сценарии","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'log in' поставить выше системного вызова 'log out'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="send" or current_verb[0]=="recieve":
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'войти' поставить выше системного вызова 'выйти'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="отправить" or current_verb[0]=="получить":
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["send",False])
-                            current_list_of_recommended_sequence.append(["recieve",False])
-                        elif current_verb[0]=="send":
-                            current_list_of_recommended_sequence.append(["send",True])
-                            current_list_of_recommended_sequence.append(["recieve",False])
+                            current_list_of_recommended_sequence.append(["отправить",False])
+                            current_list_of_recommended_sequence.append(["получить",False])
+                        elif current_verb[0]=="отправить":
+                            current_list_of_recommended_sequence.append(["отправить",True])
+                            current_list_of_recommended_sequence.append(["получить",False])
                         else:
-                            current_list_of_recommended_sequence.append(["send",False])
-                            current_list_of_recommended_sequence.append(["recieve",True])
+                            current_list_of_recommended_sequence.append(["отправить",False])
+                            current_list_of_recommended_sequence.append(["получить",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1882,23 +1911,23 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'send' и 'recieve', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'оптравить' и 'получить', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('send' или 'find') связанный с системным вызовом 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('оптравить' или 'найти') связанный с системным вызовом 'получить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'recieve', так как существует системный вызов 'send', но нет ответа на эту отправку","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'получить', так как существует системный вызов 'оптравить', но нет ответа на эту отправку","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'send' поставить выше системного вызова 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="find" or current_verb[0]=="recieve":
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'оптравить' поставить выше системного вызова 'получить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="найти" or current_verb[0]=="получить":
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["find",False])
-                            current_list_of_recommended_sequence.append(["recieve",False])
-                        elif current_verb[0]=="find":
-                            current_list_of_recommended_sequence.append(["find",True])
-                            current_list_of_recommended_sequence.append(["recieve",False])
+                            current_list_of_recommended_sequence.append(["найти",False])
+                            current_list_of_recommended_sequence.append(["получить",False])
+                        elif current_verb[0]=="найти":
+                            current_list_of_recommended_sequence.append(["найти",True])
+                            current_list_of_recommended_sequence.append(["получить",False])
                         else:
-                            current_list_of_recommended_sequence.append(["find",False])
-                            current_list_of_recommended_sequence.append(["recieve",True])
+                            current_list_of_recommended_sequence.append(["найти",False])
+                            current_list_of_recommended_sequence.append(["получить",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1921,20 +1950,20 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'find' и 'recieve', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'найти' и 'получить', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('send' или 'find') связанный с системным вызовом 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить парный системный вызов ('оптравить' или 'найти') связанный с системным вызовом 'получить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'recieve', так как существует системный вызов 'find', ведь при поиске необходимо получить искомый объект","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'получить', так как существует системный вызов 'найти', ведь при поиске необходимо получить искомый объект","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'find' поставить выше системного вызова 'recieve'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="edit":
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'найти' поставить выше системного вызова 'получить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="редактировать":
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["find",False])
-                            current_list_of_recommended_sequence.append(["edit",False])
-                        elif current_verb[0]=="edit":
-                            current_list_of_recommended_sequence.append(["find",False])
-                            current_list_of_recommended_sequence.append(["edit",True])
+                            current_list_of_recommended_sequence.append(["найти",False])
+                            current_list_of_recommended_sequence.append(["редактировать",False])
+                        elif current_verb[0]=="редактировать":
+                            current_list_of_recommended_sequence.append(["найти",False])
+                            current_list_of_recommended_sequence.append(["редактировать",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1957,21 +1986,21 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'find' и 'edit', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'найти' и 'редактировать', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'find', так как существует системный вызов 'edit'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'найти', так как существует системный вызов 'редактировать'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'find' поставить выше системного вызова 'edit'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="start" or current_verb[0]=="finish":                    
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'найти' поставить выше системного вызова 'редактировать'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="начать" or current_verb[0]=="закончить":                    
                         if current_sequence_diagram!=self:
-                            current_list_of_recommended_sequence.append(["start",False])
-                            current_list_of_recommended_sequence.append(["finish",False])
-                        elif current_verb[0]=="start":
-                            current_list_of_recommended_sequence.append(["start",True])
-                            current_list_of_recommended_sequence.append(["finish",False])
+                            current_list_of_recommended_sequence.append(["начать",False])
+                            current_list_of_recommended_sequence.append(["закончить",False])
+                        elif current_verb[0]=="начать":
+                            current_list_of_recommended_sequence.append(["начать",True])
+                            current_list_of_recommended_sequence.append(["закончить",False])
                         else:
-                            current_list_of_recommended_sequence.append(["start",False])
-                            current_list_of_recommended_sequence.append(["finish",True])
+                            current_list_of_recommended_sequence.append(["начать",False])
+                            current_list_of_recommended_sequence.append(["закончить",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -1994,26 +2023,26 @@ class obj_Diagram(Object):
                             if begin!=-1 and end!=-1:
                                 break
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'start' и 'finish', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'начать' и 'закончить', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'start', так как существует системный вызов 'finish'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'начать', так как существует системный вызов 'закончить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'finish', так как существует системный вызов 'start'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'закончить', так как существует системный вызов 'начать'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'start' поставить выше системного вызова 'finish'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
-                    elif current_verb[0]=="download" or current_verb[0]=="upload":
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'начать' поставить выше системного вызова 'закончить'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                    elif current_verb[0]=="скачать" or current_verb[0]=="загрузить":
                         if current_sequence_diagram!=self:
                             current_list_of_recommended_sequence.append(["select",False])
-                            current_list_of_recommended_sequence.append(["download",False])
-                            current_list_of_recommended_sequence.append(["upload",False])
-                        elif current_verb[0]=="download":
+                            current_list_of_recommended_sequence.append(["скачать",False])
+                            current_list_of_recommended_sequence.append(["загрузить",False])
+                        elif current_verb[0]=="скачать":
                             current_list_of_recommended_sequence.append(["select",False])
-                            current_list_of_recommended_sequence.append(["download",True])
-                            current_list_of_recommended_sequence.append(["upload",False])
+                            current_list_of_recommended_sequence.append(["скачать",True])
+                            current_list_of_recommended_sequence.append(["загрузить",False])
                         else:
                             current_list_of_recommended_sequence.append(["select",False])
-                            current_list_of_recommended_sequence.append(["download",False])
-                            current_list_of_recommended_sequence.append(["upload",True])
+                            current_list_of_recommended_sequence.append(["скачать",False])
+                            current_list_of_recommended_sequence.append(["загрузить",True])
                         current_list_of_sequence_of_current_diagram_sequence=[]
                         for j in range(0,len(current_sequence_diagram.Get_list_of_objects())):
                             if current_sequence_diagram.Get_object(j).Get_type()=="uml:Message":
@@ -2045,13 +2074,13 @@ class obj_Diagram(Object):
                                     second_sequence=current_list_of_recommended_sequence[j][0]
                                     break 
                         if begin==end:#оба равны -1
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'select' и 'download или upload', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системные вызовы 'выбрать' и 'скачать' или 'загрузить', так как их наличие подразумевает само название данной диаграммы","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin==-1 and end!=-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'select', так как существует системный вызов '"+second_sequence+"'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'выбрать', так как существует системный вызов '"+second_sequence+"'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin!=-1 and end==-1:
-                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'download или upload', так как существует системный вызов 'select'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмму системных взаимодействий '"+current_sequence_diagram.Get_name()+"' добавить системный вызов 'скачать' или 'загрузить', так как существует системный вызов 'выбрать'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
                         elif begin>end:
-                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'select' поставить выше системного вызова '"+second_sequence+"'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
+                            self.model.Add_recomendation("Рекомендуется в диаграмме системных взаимодействий '"+current_sequence_diagram.Get_name()+"' системный вызов 'выбрать' поставить выше системного вызова '"+second_sequence+"'","Механизм предложения парных глаголов в диаграммах прецеднтов","None",[])
     def GRASP(self):
         if self.type=="Logical":
             for object in self.list_of_objects:
@@ -2074,7 +2103,7 @@ class obj_Diagram(Object):
                         list_of_functions=object.Get_list_of_functions().copy()
                         for j in range(0,len(list_of_params)):
                             flag_exist=False
-                            current_name="Create_"+list_of_params[j][1]
+                            current_name="Создать "+list_of_params[j][1]
                             for k in range(0,len(list_of_functions)):
                                 if list_of_functions[k][2]==current_name:
                                     flag_exist=True
@@ -2161,7 +2190,7 @@ class obj_Class(Object):
         return self.recipient_class_id
     def Parse_class(self,root):
         local_root=root
-        help_root=self.diagram.model.extention_root.find("element",attrs={"xmi:idref":local_root["xmi:id"]})
+        help_root=self.diagram.model.extension_root.find("element",attrs={"xmi:idref":local_root["xmi:id"]})
         if help_root!=None:
             if help_root.has_attr("xmi:idref"):
                 self.Set_id(help_root["xmi:idref"])
@@ -2215,7 +2244,7 @@ class obj_Class(Object):
                         self.list_of_functions.append(new_operation)
             extendedProperties=help_root.find("extendedProperties")
             if extendedProperties!=None and extendedProperties.has_attr("conID"):
-                connector=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":extendedProperties["conID"]})
+                connector=self.diagram.model.extension_root.find("connector",attrs={"xmi:idref":extendedProperties["conID"]})
                 if connector!=None:
                     source=connector.find("source")
                     if source!=None and source.has_attr("xmi:idref"):
@@ -2322,7 +2351,7 @@ class obj_Connection(Object):
         if local_root.has_attr("name"):
             self.Set_name(local_root["name"])
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.name+"' начал читаться из XML файла"]])
-        help_root=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":self.id})
+        help_root=self.diagram.model.extension_root.find("connector",attrs={"xmi:idref":self.id})
         if help_root!=None:
             sender_root=help_root.find("source")
             if sender_root!=None:
@@ -2367,7 +2396,6 @@ class obj_Use_Case(Object):
     def __init__(self,init_diagram):
         self.diagram=init_diagram
         self.list_of_actors=[]
-        self.parents_id=[]
         self.list_of_includions=[]#what is included in this Use Case (required)
         self.list_of_extentions=[]#what extends this Use Case (optional, but possible)
         super().__init__()
@@ -2431,7 +2459,7 @@ class obj_Use_Case(Object):
         help_root=None
         if local_root.has_attr("xmi:id"):
             self.id=local_root["xmi:id"]
-            help_root=self.diagram.model.extention_root.find("element",attrs={"xmi:idref":local_root["xmi:id"]})
+            help_root=self.diagram.model.extension_root.find("element",attrs={"xmi:idref":local_root["xmi:id"]})
             if help_root!=None:
                 if help_root.has_attr("name"):
                     self.name=help_root["name"]
@@ -2448,7 +2476,7 @@ class obj_Use_Case(Object):
                     if UseCases!=None:
                         for UseCase in UseCases:
                             if UseCase.has_attr("xmi:id") and UseCase.has_attr("end") and UseCase["end"]==self.id:
-                                connector=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":UseCase["xmi:id"]})
+                                connector=self.diagram.model.extension_root.find("connector",attrs={"xmi:idref":UseCase["xmi:id"]})
                                 if connector!=None:
                                     properties=connector.find("properties")
                                     if properties!=None and properties.has_attr("stereotype") and properties["stereotype"]=="extend":
@@ -2467,12 +2495,22 @@ class obj_Use_Case(Object):
                                                     new_extention.append(result)
                                             self.Add_extention(new_extention)
                             elif UseCase.has_attr("xmi:id") and UseCase.has_attr("start") and UseCase["start"]==self.id:
-                                connector=self.diagram.model.extention_root.find("connector",attrs={"xmi:idref":UseCase["xmi:id"]})
+                                connector=self.diagram.model.extension_root.find("connector",attrs={"xmi:idref":UseCase["xmi:id"]})
                                 if connector!=None:
                                     properties=connector.find("properties")
                                     if properties!=None and properties.has_attr("stereotype") and properties["stereotype"]=="include":
                                         if connector.find("target") and connector.target.has_attr("xmi:idref"):
                                             self.Add_includion(connector.target["xmi:idref"])
+                    Associations=help_root.find_all("Association")
+                    if Associations!=None:
+                        for Association in Associations:
+                            connected_object_id=None
+                            if Association.has_attr("start") and Association["start"]!=self.id:
+                                connected_object_id=Association["start"]
+                            elif Association.has_attr("end") and Association["end"]!=self.id:
+                                connected_object_id=Association["end"]
+                            if connected_object_id!=None and self.diagram.model.extension_root.find("element",attrs={"xmi:idref":connected_object_id,"xmi:type":"uml:Actor"}):
+                                self.Add_actor(connected_object_id)
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' начал читаться из XML файла"]])
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' прочитан"]])
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавляется в модель"]])
@@ -2623,9 +2661,9 @@ class obj_Alternative(Object):
         if local_root.has_attr("interactionOperator"):
             self.type_alternative=local_root["interactionOperator"]
         for child in local_root.children:
-            if child.name=="covered":
-                self.Add_covered_lifeline(child["xmi:idref"])
-            elif child.name=="operand":
+            #if child.name=="covered":
+            #    self.Add_covered_lifeline(child["xmi:idref"])
+            if child.name=="operand":
                 new_alernative_variavnt=[]
                 for elements in child.children:
                     if elements.name=="guard":
@@ -2635,10 +2673,20 @@ class obj_Alternative(Object):
                         new_alernative_variavnt.append(elements["covered"])
                 if len(new_alernative_variavnt)!=0:
                     self.Add_alternative(new_alernative_variavnt)
+        for alterntive in self.list_of_alternatives:
+            for i in range(1,len(alterntive)):
+                flag_exist=False
+                for lifeline_id in self.list_of_covered_lifeline:
+                    if lifeline_id==alterntive[i]:
+                        flag_exist=True
+                        break
+                if flag_exist==False:
+                    self.list_of_covered_lifeline.append(alterntive[i])
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' прочитан"]])
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавляется в модель"]])
         self.diagram.Add_object(self)
         self.diagram.model.controller.AddCommand(["Visual",["Трассировка парсинга",self.type+"'"+self.name+"' добавлен в модель"]])
+        print(self.list_of_alternatives)
         return
 
 controller=controller()

@@ -1,5 +1,5 @@
 Password:1
 Mechanism/Paired words in sequence diagrams(Контроль наличия парных вызовов в диаграммах прецедентов|0):False
-Pattern/GRASP(Паттерн GRASP|0):False
+Pattern/GRASP(Паттерн GRASP|0):True
 Mechanism/Offering classes on frequently repeated nouns in use cases(Предложение создания классов по часто повторяющимся словам в прецедентах|0):False
 Mechanism/Accounting for past comments(Механзим, проводящий анализ связи между прошлыми замечаниями и текущими|999):False
