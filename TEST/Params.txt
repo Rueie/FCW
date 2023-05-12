@@ -1,5 +1,7 @@
 Password:1
 Mechanism/Paired words in sequence diagrams(Контроль наличия парных вызовов в диаграммах прецедентов|0):False
-Pattern/GRASP(Паттерн GRASP|0):True
+Pattern/GRASP(Паттерн GRASP|0):False
 Mechanism/Offering classes on frequently repeated nouns in use cases(Предложение создания классов по часто повторяющимся словам в прецедентах|0):False
 Mechanism/Accounting for past comments(Механзим, проводящий анализ связи между прошлыми замечаниями и текущими|999):False
+!CodeGenerator|Генератор Рьюи|D:\учеба\седьмой сем\Защита информации\Пз\Python\Кодирование на питоне\Кодирование на питоне\Кодирование_на_питоне.py
+!CodeGenerator|Генератор Мишукова|полный путь исполняемого файла

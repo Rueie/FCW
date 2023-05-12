@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import subprocess
 import time
 import threading
 import math
@@ -7,6 +8,7 @@ import inspect
 import re
 import traceback
 import platform
+import keyboard
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
@@ -177,9 +179,11 @@ class visual:
         self.files_page=Frame(self.pages)
         self.result_page=Frame(self.pages)
         self.tracert_page=Frame(self.pages)
+        self.code_generation_page=Frame(self.pages)
         self.pages.add(self.files_page,text="Анализируемый XML файл модели")
         self.pages.add(self.result_page,text="Результат анализа",state="disabled")
         self.pages.add(self.tracert_page,text="Трассировка модели",state="disabled")
+        self.pages.add(self.code_generation_page,text="Кодогенерация",state="disabled")
         self.pages.pack(expand = True, fill ="both")
 
         #первая вкладка
@@ -280,6 +284,19 @@ class visual:
         self.tracert_page_tree_srcollbar=Scrollbar(self.tracert_page_frame,orient="vertical",command=self.tracert_page_tree.yview)
         self.tracert_page_tree_srcollbar.pack(side=RIGHT,fill="y")
         self.tracert_page_tree["yscrollcommand"] = self.tracert_page_tree_srcollbar.set
+        
+        #четвёртая страница
+        self.code_generation_page_EA_button=Button(self.code_generation_page,text="Открыть кодогенератор Enterprise Architect",command=lambda:[keyboard.send("Alt+Tab"),time.sleep(0.1),keyboard.send("Ctrl+Alt+K")])
+        self.code_generation_page_EA_button.grid(row=1,column=1,sticky="nsew",pady=5)
+        
+        self.code_generation_page.rowconfigure(0,weight=1)
+        self.code_generation_page.rowconfigure(1,weight=1)
+        self.code_generation_page.rowconfigure(2,weight=1)
+        self.code_generation_page.columnconfigure(0,weight=1)
+        self.code_generation_page.columnconfigure(1,weight=2)
+        self.code_generation_page.columnconfigure(2,weight=1)
+        
+        self.controller.AddCommand(["Model",["Список кодогенераторов"]])
 
         self.main_window.after(100,self.CheckCommands)
         self.main_window.mainloop()
@@ -389,6 +406,16 @@ class visual:
                     
                     self.window_alert.grab_set()
                 self.list_of_last_id_of_string.pop(0)
+            elif self.list_of_commands[0][0]=="Список кодогенераторов":
+                count=0
+                for CodeGen in self.list_of_commands[0][1]:
+                    local_comand=None
+                    if CodeGen[1]!=None:
+                        local_comand=lambda path=CodeGen[1]:subprocess.Popen([path],shell=True,stdout=subprocess.PIPE)
+                    new_button=Button(self.code_generation_page,text=CodeGen[0],command=local_comand)
+                    new_button.grid(row=count+2,column=1,sticky="nsew",pady=5)
+                    self.code_generation_page.rowconfigure(count+3,weight=1)
+                    count+=1
             self.list_of_commands.pop(0)
         self.main_window.after(1,self.CheckCommands)
     def SetModel(self,list_of_objects):
@@ -504,10 +531,11 @@ class visual:
                 self.files_page_text_from_file.insert(END,xml_file.read())
                 self.files_page_text_from_file["state"]='disabled'
                 self.pages.tab(1,state='normal')
-                self.number_of_opened_frames=2
+                self.pages.tab(3,state='normal')
+                self.number_of_opened_frames=3
                 if self.login_button['state']=='disabled':
                     self.pages.tab(2,state='normal')
-                    self.number_of_opened_frames=3
+                    self.number_of_opened_frames=4
             else:
                 self.files_page_file_path.insert(END,"Некорректный формат файла...")
                 self.files_page_text_from_file['state']='normal'
@@ -516,6 +544,7 @@ class visual:
                 self.files_page_text_from_file["state"]='disabled'
                 self.pages.tab(1,state='disabled')
                 self.pages.tab(2,state='disabled')
+                self.pages.tab(3,state='disabled')
         else:
             self.files_page_text_from_file['state']='normal'
             self.files_page_text_from_file.delete("0.0",END)
@@ -524,6 +553,7 @@ class visual:
             self.files_page_file_path.insert(END,"Некорректный путь...")
             self.pages.tab(1,state='disabled')
             self.pages.tab(2,state='disabled')
+            self.pages.tab(3,state='disabled')
         self.files_page_file_path['state']='disabled'
     def ChoiceMechanisms(self):
         self.window_with_mechanisms=Toplevel()
@@ -612,6 +642,7 @@ class Model(Object):
         self.list_of_diagrams=[]#List of obj_Diagram type objects
         self.list_of_recomendations=[]#[[группа замечаний,[[замечание,тип замечания,[список id, совпадающий с объектами в кавычках]],...,[замечание,тип замечания,[[список id, совпадающий с объектами в кавычках]]]]],...,[группа замечаний,[...]]]
         self.list_of_patterns_and_mechanisms_from_file=[]
+        self.list_of_code_generators=[]
         file_with_params=open(file_path_with_params,"r",encoding=coding_other_files)
         while True:
             line=file_with_params.readline()
@@ -620,14 +651,23 @@ class Model(Object):
             elif line[0:8]!="Password":
                 words=re.search('(.*)/(.*)\((.*)\|(\d*)\):(.*)',line)
                 new_mech_or_patt=[]
-                new_mech_or_patt.append(words.group(1))
-                new_mech_or_patt.append(words.group(2))
-                new_mech_or_patt.append(words.group(5))
-                new_mech_or_patt.append(int(words.group(4)))
-                new_mech_or_patt.append(words.group(3))
-                if new_mech_or_patt[2][len(new_mech_or_patt[2])-1]=='\n':
-                    new_mech_or_patt[2]=new_mech_or_patt[2][0:len(new_mech_or_patt[2])-1]
-                self.list_of_patterns_and_mechanisms_from_file.append(new_mech_or_patt)
+                if line[0]!="!":
+                    new_mech_or_patt.append(words.group(1))
+                    new_mech_or_patt.append(words.group(2))
+                    new_mech_or_patt.append(words.group(5))
+                    new_mech_or_patt.append(int(words.group(4)))
+                    new_mech_or_patt.append(words.group(3))
+                    if new_mech_or_patt[2][len(new_mech_or_patt[2])-1]=='\n':
+                        new_mech_or_patt[2]=new_mech_or_patt[2][0:len(new_mech_or_patt[2])-1]
+                    self.list_of_patterns_and_mechanisms_from_file.append(new_mech_or_patt)
+                else:
+                    words=re.search("!([^\|]+)\|([^\|]+)\|([^\|]+)",line)
+                    if words.group(1)=="CodeGenerator":
+                        if os.path.isfile(words.group(3)[:-1])==True:
+                            self.list_of_code_generators.append([words.group(2),words.group(3)[:-1]])
+                        else:
+                            self.list_of_code_generators.append([words.group(2),None])
+        #print(self.list_of_code_generators)
         self.list_of_patterns_and_mechanisms_from_file=sorted(self.list_of_patterns_and_mechanisms_from_file,key=lambda pat_or_meh: pat_or_meh[3])
         file_with_params.close()
         self.thread1=Thread(target=self.CheckCommands,args=())
@@ -1117,6 +1157,11 @@ class Model(Object):
                     self.controller.AddCommand(["Visual",["Установить объекты рекомендации",new_list_of_objects]])
                 elif self.list_of_commands[0][0]=="Решение проблемы":
                     self.GetSolution(self.list_of_commands[0][1])
+                elif self.list_of_commands[0][0]=="Список кодогенераторов":
+                    new_mes=["Список кодогенераторов",[]]
+                    for CodeGen in self.list_of_code_generators:
+                        new_mes[-1].append(CodeGen)
+                    self.controller.AddCommand(["Visual",new_mes])
                 self.list_of_commands.pop(0)
             else:
                 time.sleep(0.1)

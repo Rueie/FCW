@@ -22,15 +22,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="A lot of class diagrams in one project.xml" />
-    <Content Include="A lot of posl diagrams in one project.xml" />
-    <Content Include="A lot of pres diagrams in one project.xml" />
     <Content Include="Params.txt" />
     <Content Include="Procrust.xml" />
     <Content Include="Prom_comments.txt" />
-    <Content Include="Prom_xml.txt" />
-    <Content Include="Test diagram classes XML2.1.xml" />
-    <Content Include="Three types of diagrams in one model.xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Procrust.py" />
