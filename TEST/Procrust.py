@@ -489,7 +489,7 @@ class visual:
                     self.LogOut()
                     self.login_button['state']='disabled'
                     self.user_label.configure(text="Режим администратора")
-                    if self.number_of_opened_frames==2:
+                    if self.number_of_opened_frames==3:
                         self.pages.tab(2,state="normal")
                 else:
                     self.current_widget.delete(0,END)
